@@ -1,0 +1,54 @@
+"""
+Health check endpoints.
+"""
+
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+from ...utils.config import settings
+
+router = APIRouter()
+
+
+class HealthResponse(BaseModel):
+    """Health check response model."""
+    status: str
+    environment: str
+    version: str
+
+
+@router.get("/health", response_model=HealthResponse)
+async def health_check():
+    """
+    Health check endpoint.
+    
+    Returns the current status of the API.
+    """
+    return HealthResponse(
+        status="healthy",
+        environment=settings.environment,
+        version="1.0.0",
+    )
+
+
+@router.get("/health/ready")
+async def readiness_check():
+    """
+    Readiness check endpoint.
+    
+    Verifies that the service is ready to accept requests.
+    Checks critical dependencies.
+    """
+    checks = {
+        "api": "ok",
+        "openai": "ok" if settings.openai_api_key else "missing",
+        "qdrant": "ok" if settings.qdrant_url and settings.qdrant_api_key else "missing",
+    }
+    
+    is_ready = all(status == "ok" for status in checks.values())
+    
+    return {
+        "status": "ready" if is_ready else "not_ready",
+        "checks": checks,
+    }
+
