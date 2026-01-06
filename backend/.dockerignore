@@ -1,0 +1,3 @@
+# Ignore everything - we're using Nixpacks/Procfile, not Docker
+*
+
