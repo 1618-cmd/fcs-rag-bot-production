@@ -1,0 +1,14 @@
+{
+  "name": "fcs-rag-bot-production",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FCS RAG Bot Production - Full-stack application with Next.js frontend and FastAPI backend",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "install": "cd frontend && npm install"
+  },
+  "workspaces": [
+    "frontend"
+  ]
+}
+
