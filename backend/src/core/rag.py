@@ -101,12 +101,11 @@ class RAGPipeline:
                 self.vector_store = None
                 return
             
-            # Load vector store using url and api_key (same pattern as ingestion)
+            # Load vector store using the client we already created
             self.vector_store = Qdrant(
-                url=settings.qdrant_url,
-                api_key=settings.qdrant_api_key,
+                client=client,
                 collection_name=settings.qdrant_collection_name,
-                embedding=self.embeddings,
+                embeddings=self.embeddings,
             )
             
             logger.info(f"✅ Loaded vector store from Qdrant collection: {settings.qdrant_collection_name}")
