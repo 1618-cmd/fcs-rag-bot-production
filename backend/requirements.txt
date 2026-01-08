@@ -2,10 +2,10 @@
 # Python 3.13+ (updated for Render compatibility)
 
 # Core RAG Framework
-numpy>=1.26.5,<2.0.0  # Try latest 1.26.x for Python 3.13 wheels
-langchain==0.1.20
-langchain-openai==0.1.7
-langchain-community==0.0.38
+numpy>=2.0.0  # Python 3.13 requires numpy 2.0+
+langchain>=0.1.20  # Allow newer versions for numpy 2.0 compatibility
+langchain-openai>=0.1.7
+langchain-community>=0.0.38
 
 # Vector Database (Production)
 qdrant-client==1.9.0
