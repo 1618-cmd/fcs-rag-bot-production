@@ -85,18 +85,34 @@ class RAGPipeline:
                 self.vector_store = None
                 return
             
-            self.vector_store = Qdrant(
-                client=None,  # Will use URL and API key
-                collection_name=settings.qdrant_collection_name,
-                embeddings=self.embeddings,
+            # Verify collection exists first
+            from qdrant_client import QdrantClient
+            client = QdrantClient(
                 url=settings.qdrant_url,
                 api_key=settings.qdrant_api_key,
+            )
+            
+            try:
+                collection_info = client.get_collection(settings.qdrant_collection_name)
+                logger.info(f"Found collection: {settings.qdrant_collection_name} with {collection_info.points_count} points")
+            except Exception as e:
+                logger.error(f"Collection {settings.qdrant_collection_name} not found: {e}")
+                logger.warning("Vector store not available. Run ingestion first!")
+                self.vector_store = None
+                return
+            
+            # Load vector store using url and api_key (same pattern as ingestion)
+            self.vector_store = Qdrant(
+                url=settings.qdrant_url,
+                api_key=settings.qdrant_api_key,
+                collection_name=settings.qdrant_collection_name,
+                embedding=self.embeddings,
             )
             
             logger.info(f"✅ Loaded vector store from Qdrant collection: {settings.qdrant_collection_name}")
             
         except Exception as e:
-            logger.error(f"Error loading vector store: {e}")
+            logger.error(f"Error loading vector store: {e}", exc_info=True)
             logger.warning("Vector store not available. Run ingestion first!")
             self.vector_store = None
     
