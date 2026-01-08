@@ -8,7 +8,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -20,5 +20,9 @@ RUN apt-get purge -y gcc g++ && \
 # Copy application
 COPY . .
 
+# Expose port (Render sets PORT automatically)
+EXPOSE $PORT
+
 # Run the app
-CMD uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Render sets PORT environment variable automatically
+CMD cd backend && uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
