@@ -1,8 +1,8 @@
 # Vena RAG Bot Production - Dependencies
-# Python 3.13+ (updated for Render compatibility)
+# Python 3.12+ (Python 3.13 has package compatibility issues)
 
 # Core RAG Framework
-numpy>=2.0.0  # Python 3.13 requires numpy 2.0+
+numpy>=1.26.0,<2.0.0  # Compatible with langchain 0.1.20 and Python 3.12
 langchain==0.1.20  # Pin to avoid breaking changes from 1.x
 langchain-openai==0.1.7  # Pin to avoid breaking changes
 langchain-community==0.0.38  # Pin to avoid breaking changes
