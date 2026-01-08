@@ -22,20 +22,27 @@ export interface QueryResponse {
 }
 
 export async function queryRAG(question: string): Promise<QueryResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/query`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ question }),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ question }),
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (err) {
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      throw new Error(`Unable to connect to backend API. Please check that the backend is running at ${API_BASE_URL}`);
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 export async function checkHealth(): Promise<{ status: string; environment: string; version: string }> {
