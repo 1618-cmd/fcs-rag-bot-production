@@ -2,7 +2,7 @@
 # Python 3.13+ (updated for Render compatibility)
 
 # Core RAG Framework
-numpy>=1.26.4,<2.0.0  # Python 3.13 compatible (1.26.4+ has wheels)
+numpy>=1.26.5,<2.0.0  # Try latest 1.26.x for Python 3.13 wheels
 langchain==0.1.20
 langchain-openai==0.1.7
 langchain-community==0.0.38
