@@ -66,3 +66,6 @@ yarn-error.log*
 # OS
 Thumbs.db
 
+# Large files that exceed GitHub's 100MB limit
+knowledge_base/Miles Documentation/Drill Down Export.csv
+
