@@ -275,13 +275,37 @@ class RAGPipeline:
             documents: List of documents
             
         Returns:
-            List of unique source names
+            List of unique source names (cleaned, relative paths)
         """
         sources = []
+        knowledge_base_path = settings.knowledge_base_dir
+        
         for doc in documents:
-            source = Path(doc.metadata.get("source", "unknown")).stem
-            if source not in sources:
-                sources.append(source)
+            source_path = doc.metadata.get("source", "unknown")
+            
+            # Convert to Path object
+            source = Path(source_path)
+            
+            # Try to extract relative path from knowledge_base
+            try:
+                if knowledge_base_path in source.parents or str(source).startswith(str(knowledge_base_path)):
+                    # Get relative path from knowledge_base
+                    relative_path = source.relative_to(knowledge_base_path)
+                    # Convert to forward slashes and remove extension
+                    clean_source = str(relative_path).replace("\\", "/").replace(".md", "").replace(".txt", "").replace(".pdf", "")
+                else:
+                    # Fallback: just use filename without extension
+                    clean_source = source.stem
+            except (ValueError, AttributeError):
+                # If path manipulation fails, just use filename
+                clean_source = source.stem
+            
+            # Remove any remaining Windows path separators
+            clean_source = clean_source.replace("\\", "/")
+            
+            if clean_source and clean_source not in sources:
+                sources.append(clean_source)
+        
         return sources
 
 
