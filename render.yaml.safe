@@ -1,0 +1,12 @@
+# Safer version - start with 2 workers instead of 4
+# Rename this to render.yaml if you want to be more cautious
+
+services:
+  - type: web
+    name: fcs-rag-bot-production
+    runtime: python
+    buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn src.api.main:app --host 0.0.0.0 --port $PORT --workers 2 --timeout-keep-alive 30
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
