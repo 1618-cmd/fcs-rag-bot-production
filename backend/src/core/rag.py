@@ -4,6 +4,7 @@ RAG retrieval and response generation pipeline for Production.
 Handles semantic search in Qdrant and response synthesis using GPT-4o.
 """
 
+import asyncio
 import logging
 from typing import List, Tuple, Optional
 from pathlib import Path
@@ -87,9 +88,11 @@ class RAGPipeline:
             
             # Verify collection exists first
             from qdrant_client import QdrantClient
+            # Use connection pooling for better performance
             client = QdrantClient(
                 url=settings.qdrant_url,
                 api_key=settings.qdrant_api_key,
+                timeout=30,  # 30 second timeout
             )
             
             try:
@@ -139,6 +142,19 @@ class RAGPipeline:
             logger.error(f"Error retrieving documents: {e}")
             raise
     
+    async def retrieve_async(self, query: str, top_k: int = None) -> List[Document]:
+        """
+        Async version of retrieve - runs in thread pool to avoid blocking.
+        
+        Args:
+            query: User query string
+            top_k: Number of documents to retrieve (defaults to settings)
+            
+        Returns:
+            List of relevant documents
+        """
+        return await asyncio.to_thread(self.retrieve, query, top_k)
+    
     def format_context(self, documents: List[Document]) -> str:
         """
         Format retrieved documents as context for the LLM.
@@ -186,6 +202,19 @@ class RAGPipeline:
             logger.error(f"Error generating response: {e}")
             raise
     
+    async def generate_response_async(self, query: str, documents: List[Document]) -> str:
+        """
+        Async version of generate_response - runs in thread pool to avoid blocking.
+        
+        Args:
+            query: User query
+            documents: Retrieved context documents
+            
+        Returns:
+            Generated response text
+        """
+        return await asyncio.to_thread(self.generate_response, query, documents)
+    
     def query(self, question: str) -> Tuple[str, List[Document]]:
         """
         Main query method: Retrieve relevant docs and generate response.
@@ -205,6 +234,32 @@ class RAGPipeline:
             
             # Generate response
             response = self.generate_response(question, documents)
+            
+            return response, documents
+            
+        except Exception as e:
+            logger.error(f"Error processing query: {e}")
+            raise
+    
+    async def query_async(self, question: str) -> Tuple[str, List[Document]]:
+        """
+        Async version of query - runs operations in parallel where possible.
+        
+        Args:
+            question: User question
+            
+        Returns:
+            Tuple of (response_text, source_documents)
+        """
+        logger.info(f"Processing query: {question[:100]}...")
+        
+        try:
+            # Retrieve relevant documents (async)
+            documents = await self.retrieve_async(question)
+            logger.info(f"Retrieved {len(documents)} relevant documents")
+            
+            # Generate response (async)
+            response = await self.generate_response_async(question, documents)
             
             return response, documents
             

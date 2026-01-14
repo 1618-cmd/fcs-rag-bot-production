@@ -48,9 +48,15 @@ async def query_rag(request: QueryRequest):
         # Get RAG pipeline
         pipeline = get_rag_pipeline()
         
-        # Query the pipeline
+        # Query the pipeline (async version for better performance)
+        # Falls back to sync if async fails
         logger.info(f"Processing query: {request.question[:100]}...")
-        response, documents = pipeline.query(request.question)
+        try:
+            response, documents = await pipeline.query_async(request.question)
+        except Exception as async_error:
+            logger.warning(f"Async query failed, falling back to sync: {async_error}")
+            # Fallback to synchronous version if async fails
+            response, documents = pipeline.query(request.question)
         
         # Extract sources
         source_names = pipeline.get_sources(documents)
