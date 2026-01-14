@@ -111,7 +111,8 @@ export default function Message({
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code({ node, inline, className, children, ...props }) {
+                code({ node, className, children, ...props }: any) {
+                  const inline = !className || !className.includes('language-');
                   const match = /language-(\w+)/.exec(className || '');
                   return !inline && match ? (
                     <SyntaxHighlighter
