@@ -6,8 +6,10 @@ Main entry point for the API server.
 
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from ..utils.config import settings, validate_settings
 from ..utils.logging_config import setup_logging
@@ -91,6 +93,18 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],  # Only needed HTTP methods
     allow_headers=["Content-Type", "Authorization"],  # Only needed headers
 )
+
+# Exception handler for validation errors (422)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log validation errors for debugging."""
+    body = await request.body()
+    logger.error(f"Validation error on {request.url.path}: {exc.errors()}")
+    logger.error(f"Request body (first 500 chars): {body[:500]}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "body_preview": body[:500].decode('utf-8', errors='ignore')},
+    )
 
 # Include routers
 app.include_router(health.router, prefix="/api", tags=["Health"])
