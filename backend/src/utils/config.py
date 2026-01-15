@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # RAG Configuration
     chunk_size: int = 500  # tokens per chunk
     chunk_overlap: int = 50  # overlap between chunks
-    top_k_results: int = 5  # number of documents to retrieve
+    top_k_results: int = 10  # number of documents to retrieve (increased for better multi-system question coverage)
     
     # Model Configuration
     max_tokens: int = 2000  # max response tokens
