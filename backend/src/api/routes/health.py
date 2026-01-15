@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ...utils.config import settings
+from ...services.cache import get_cache_stats
 
 router = APIRouter()
 
@@ -104,3 +105,14 @@ async def warmup_check_head():
     # Return empty response for HEAD (status 200 to indicate success)
     from fastapi import Response
     return Response(status_code=200)
+
+
+@router.get("/health/cache")
+async def cache_stats():
+    """
+    Get cache statistics.
+    
+    Returns information about Redis cache status and usage.
+    """
+    stats = get_cache_stats()
+    return stats

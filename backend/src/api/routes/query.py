@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from ...core.rag import get_rag_pipeline
 from ...utils.config import settings
+from ...services.cache import get_cached_response, cache_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -45,6 +46,14 @@ async def query_rag(request: QueryRequest):
     start_time = time.time()
     
     try:
+        # Check cache first
+        cached_response = get_cached_response(request.question)
+        if cached_response:
+            # Return cached response (much faster!)
+            logger.info(f"Returning cached response (saved {cached_response.get('latency_ms', 0)}ms)")
+            return QueryResponse(**cached_response)
+        
+        # Cache miss - process query
         # Get RAG pipeline
         pipeline = get_rag_pipeline()
         
@@ -67,12 +76,18 @@ async def query_rag(request: QueryRequest):
         
         logger.info(f"Query completed in {latency_ms:.2f}ms")
         
-        return QueryResponse(
+        # Build response
+        query_response = QueryResponse(
             answer=response,
             sources=sources,
             latency_ms=round(latency_ms, 2),
             model=settings.openai_model,
         )
+        
+        # Cache the response for future queries
+        cache_response(request.question, query_response.dict())
+        
+        return query_response
         
     except ValueError as e:
         logger.error(f"Validation error: {e}")
