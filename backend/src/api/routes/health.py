@@ -54,6 +54,7 @@ async def readiness_check():
 
 
 @router.get("/health/warmup")
+@router.head("/health/warmup")  # Also support HEAD requests for monitoring services
 async def warmup_check():
     """
     Warm-up endpoint that initializes the RAG pipeline.
@@ -61,10 +62,12 @@ async def warmup_check():
     Call this endpoint after deployment to pre-initialize the pipeline
     and eliminate cold start delays for the first user query.
     
+    Supports both GET and HEAD requests for compatibility with monitoring services.
+    
     This endpoint can be called by:
     - Render health checks
     - Cron jobs
-    - External monitoring services
+    - External monitoring services (including those using HEAD method)
     """
     try:
         from ...core.rag import get_rag_pipeline
@@ -75,6 +78,8 @@ async def warmup_check():
         # Verify pipeline is actually ready by checking vector store
         pipeline_ready = pipeline.vector_store is not None
         
+        # FastAPI automatically handles HEAD requests (returns empty body)
+        # But pipeline initialization still happens, which is what we want for warm-up
         return {
             "status": "warmed_up" if pipeline_ready else "warming",
             "pipeline_initialized": pipeline_ready,
