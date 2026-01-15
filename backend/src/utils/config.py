@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     s3_bucket_name: Optional[str] = None
     s3_prefix: str = ""  # Optional prefix/folder in S3 bucket
     
+    # Ingestion API Key (optional - for securing the /api/ingest endpoint)
+    ingestion_api_key: Optional[str] = None
+    
     # RAG Configuration
     chunk_size: int = 500  # tokens per chunk
     chunk_overlap: int = 50  # overlap between chunks

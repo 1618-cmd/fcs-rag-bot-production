@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from ..utils.config import settings, validate_settings
 from ..utils.logging_config import setup_logging
-from .routes import query, health
+from .routes import query, health, ingestion
 
 # Set up logging
 setup_logging(log_level=settings.log_level)
@@ -109,6 +109,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # Include routers
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(query.router, prefix="/api", tags=["Query"])
+app.include_router(ingestion.router, prefix="/api", tags=["Ingestion"])
 
 
 @app.get("/")
