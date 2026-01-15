@@ -17,7 +17,7 @@ router = APIRouter()
 
 class QueryRequest(BaseModel):
     """Request model for RAG query."""
-    question: str = Field(..., description="The question to ask", min_length=1, max_length=1000)
+    question: str = Field(..., description="The question to ask", min_length=1, max_length=10000)  # Increased to support long code snippets
     top_k: Optional[int] = Field(None, description="Number of documents to retrieve (default: 5)", ge=1, le=10)
 
 
