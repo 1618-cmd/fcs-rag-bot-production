@@ -33,6 +33,30 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Qdrant URL: {settings.qdrant_url}")
     
+    # Pre-initialize RAG pipeline to eliminate cold start delay
+    # This ensures the first user doesn't wait 10-25 seconds for initialization
+    # Wrapped in try/except to ensure API starts even if initialization fails
+    # Qdrant client has a 30s timeout, so worst case is 30s delay on startup
+    logger.info("Pre-initializing RAG pipeline (this may take a few seconds)...")
+    try:
+        from ..core.rag import get_rag_pipeline
+        import time
+        
+        start_time = time.time()
+        
+        # Initialize pipeline synchronously (better than first user waiting)
+        # Qdrant client already has 30s timeout configured, so this won't hang forever
+        pipeline = get_rag_pipeline()
+        
+        init_time = time.time() - start_time
+        logger.info(f"✅ RAG pipeline pre-initialized successfully in {init_time:.2f}s")
+        
+    except Exception as e:
+        # If initialization fails, API still starts - pipeline will init on first query
+        logger.warning(f"⚠️  RAG pipeline pre-initialization failed (will initialize on first query): {e}")
+        logger.info("This is not critical - the API will still start and initialize on first query")
+        # Don't re-raise - we want the API to start even if pipeline init fails
+    
     yield
     
     # Shutdown

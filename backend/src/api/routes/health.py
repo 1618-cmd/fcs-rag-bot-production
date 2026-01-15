@@ -52,3 +52,37 @@ async def readiness_check():
         "checks": checks,
     }
 
+
+@router.get("/health/warmup")
+async def warmup_check():
+    """
+    Warm-up endpoint that initializes the RAG pipeline.
+    
+    Call this endpoint after deployment to pre-initialize the pipeline
+    and eliminate cold start delays for the first user query.
+    
+    This endpoint can be called by:
+    - Render health checks
+    - Cron jobs
+    - External monitoring services
+    """
+    try:
+        from ...core.rag import get_rag_pipeline
+        
+        # Force pipeline initialization
+        pipeline = get_rag_pipeline()
+        
+        # Verify pipeline is actually ready by checking vector store
+        pipeline_ready = pipeline.vector_store is not None
+        
+        return {
+            "status": "warmed_up" if pipeline_ready else "warming",
+            "pipeline_initialized": pipeline_ready,
+            "message": "RAG pipeline is ready" if pipeline_ready else "Pipeline initialization in progress",
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "pipeline_initialized": False,
+            "error": str(e),
+        }
