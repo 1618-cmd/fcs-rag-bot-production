@@ -146,6 +146,9 @@ class RAGPipeline:
             self.vector_store = None
             self._load_vector_store()
             
+            # Log configuration for debugging
+            logger.info(f"RAG Pipeline initialized with top_k_results={settings.top_k_results}")
+            
             # Create prompt template
             self.prompt = ChatPromptTemplate.from_messages([
                 ("system", SYSTEM_PROMPT),
@@ -214,8 +217,9 @@ class RAGPipeline:
         
         try:
             k = top_k or settings.top_k_results
+            logger.info(f"Retrieving {k} documents (top_k_results={settings.top_k_results})")
             documents = self.vector_store.similarity_search(query, k=k)
-            logger.debug(f"Retrieved {len(documents)} documents for query")
+            logger.info(f"Retrieved {len(documents)} documents for query")
             return documents
             
         except Exception as e:
