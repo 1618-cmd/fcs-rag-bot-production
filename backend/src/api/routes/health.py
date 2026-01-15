@@ -53,21 +53,10 @@ async def readiness_check():
     }
 
 
-@router.get("/health/warmup")
-@router.head("/health/warmup")  # Also support HEAD requests for monitoring services
-async def warmup_check():
+def _warmup_logic():
     """
-    Warm-up endpoint that initializes the RAG pipeline.
-    
-    Call this endpoint after deployment to pre-initialize the pipeline
-    and eliminate cold start delays for the first user query.
-    
-    Supports both GET and HEAD requests for compatibility with monitoring services.
-    
-    This endpoint can be called by:
-    - Render health checks
-    - Cron jobs
-    - External monitoring services (including those using HEAD method)
+    Shared logic for warm-up endpoint (used by both GET and HEAD).
+    Initializes the RAG pipeline and returns status.
     """
     try:
         from ...core.rag import get_rag_pipeline
@@ -78,8 +67,6 @@ async def warmup_check():
         # Verify pipeline is actually ready by checking vector store
         pipeline_ready = pipeline.vector_store is not None
         
-        # FastAPI automatically handles HEAD requests (returns empty body)
-        # But pipeline initialization still happens, which is what we want for warm-up
         return {
             "status": "warmed_up" if pipeline_ready else "warming",
             "pipeline_initialized": pipeline_ready,
@@ -91,3 +78,29 @@ async def warmup_check():
             "pipeline_initialized": False,
             "error": str(e),
         }
+
+
+@router.get("/health/warmup")
+async def warmup_check_get():
+    """
+    Warm-up endpoint that initializes the RAG pipeline (GET method).
+    
+    Call this endpoint after deployment to pre-initialize the pipeline
+    and eliminate cold start delays for the first user query.
+    """
+    return _warmup_logic()
+
+
+@router.head("/health/warmup")
+async def warmup_check_head():
+    """
+    Warm-up endpoint that initializes the RAG pipeline (HEAD method).
+    
+    Supports HEAD requests for monitoring services that use HEAD method.
+    Pipeline initialization still happens even with HEAD requests.
+    """
+    # HEAD requests should still initialize the pipeline
+    _warmup_logic()
+    # Return empty response for HEAD (status 200 to indicate success)
+    from fastapi import Response
+    return Response(status_code=200)
