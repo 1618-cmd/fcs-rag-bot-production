@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     project_root: Path = Path(__file__).parent.parent.parent.parent
     knowledge_base_dir: Path = project_root / "knowledge_base"
     
+    # AWS S3 Configuration (optional - for knowledge base hosting)
+    use_s3: bool = False  # Set to True to use S3 instead of local filesystem
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
+    aws_region: str = "us-east-1"  # Default AWS region
+    s3_bucket_name: Optional[str] = None
+    s3_prefix: str = ""  # Optional prefix/folder in S3 bucket
+    
     # RAG Configuration
     chunk_size: int = 500  # tokens per chunk
     chunk_overlap: int = 50  # overlap between chunks

@@ -6,6 +6,7 @@ and stores them in Qdrant Cloud for semantic search.
 """
 
 import logging
+import io
 from pathlib import Path
 from typing import List, Optional
 
@@ -18,20 +19,143 @@ from qdrant_client.models import Distance, VectorParams
 
 from ..utils.config import settings, validate_settings
 
+# AWS S3 support (optional)
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+    S3_AVAILABLE = True
+except ImportError:
+    S3_AVAILABLE = False
+    boto3 = None
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
 
-def load_documents(knowledge_base_path: Path) -> List:
+def load_documents_from_s3(bucket_name: str, prefix: str = "") -> List:
     """
-    Load all markdown and text documents from knowledge base.
+    Load all markdown and text documents from AWS S3 bucket.
     
     Args:
-        knowledge_base_path: Path to knowledge base directory
+        bucket_name: Name of S3 bucket
+        prefix: Optional prefix/folder path in S3 bucket
         
     Returns:
         List of loaded documents
     """
+    if not S3_AVAILABLE:
+        raise ImportError("boto3 is not installed. Install it with: pip install boto3")
+    
+    logger.info(f"Loading documents from S3: s3://{bucket_name}/{prefix}")
+    
+    documents = []
+    
+    try:
+        # Initialize S3 client
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            region_name=settings.aws_region
+        )
+        
+        # List all objects in the bucket with the prefix
+        paginator = s3_client.get_paginator('list_objects_v2')
+        pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
+        
+        # Supported file extensions
+        supported_extensions = {'.md', '.txt', '.pdf'}
+        
+        for page in pages:
+            if 'Contents' not in page:
+                continue
+                
+            for obj in page['Contents']:
+                key = obj['Key']
+                
+                # Skip if it's a directory (ends with /)
+                if key.endswith('/'):
+                    continue
+                
+                # Check if file extension is supported
+                file_ext = Path(key).suffix.lower()
+                if file_ext not in supported_extensions:
+                    continue
+                
+                try:
+                    # Download file content
+                    response = s3_client.get_object(Bucket=bucket_name, Key=key)
+                    content = response['Body'].read()
+                    
+                    # Create a document based on file type
+                    if file_ext == '.pdf':
+                        # For PDFs, we need to use PyPDFLoader with BytesIO
+                        from langchain_community.document_loaders import PyPDFLoader
+                        import tempfile
+                        import os
+                        
+                        # Create temporary file for PDF
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+                            tmp_file.write(content)
+                            tmp_path = tmp_file.name
+                        
+                        try:
+                            pdf_loader = PyPDFLoader(tmp_path)
+                            docs = pdf_loader.load()
+                            # Update source to show S3 path
+                            for doc in docs:
+                                doc.metadata['source'] = f"s3://{bucket_name}/{key}"
+                            documents.extend(docs)
+                        finally:
+                            os.unlink(tmp_path)
+                    else:
+                        # For text files (md, txt), decode and create document
+                        text_content = content.decode('utf-8')
+                        from langchain_core.documents import Document
+                        doc = Document(
+                            page_content=text_content,
+                            metadata={'source': f"s3://{bucket_name}/{key}"}
+                        )
+                        documents.append(doc)
+                        
+                except Exception as e:
+                    logger.warning(f"Error loading {key} from S3: {e}")
+                    continue
+        
+        logger.info(f"Found {len(documents)} documents in S3")
+        
+    except ClientError as e:
+        logger.error(f"AWS S3 error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Error loading documents from S3: {e}")
+        raise
+    
+    return documents
+
+
+def load_documents(knowledge_base_path: Optional[Path] = None) -> List:
+    """
+    Load all markdown and text documents from knowledge base.
+    Supports both local filesystem and AWS S3.
+    
+    Args:
+        knowledge_base_path: Path to knowledge base directory (for local filesystem)
+                            If None and use_s3 is True, will load from S3
+        
+    Returns:
+        List of loaded documents
+    """
+    # Check if S3 should be used
+    if settings.use_s3:
+        if not settings.s3_bucket_name:
+            raise ValueError("S3_BUCKET_NAME must be set when USE_S3 is True")
+        return load_documents_from_s3(settings.s3_bucket_name, settings.s3_prefix)
+    
+    # Otherwise, use local filesystem
+    if knowledge_base_path is None:
+        knowledge_base_path = settings.knowledge_base_dir
+    
     logger.info(f"Loading documents from: {knowledge_base_path}")
     
     documents = []
@@ -226,8 +350,8 @@ def ingest_knowledge_base(collection_name: Optional[str] = None) -> Qdrant:
         settings.knowledge_base_dir.mkdir(parents=True, exist_ok=True)
         raise FileNotFoundError("Add documents to knowledge_base/ folder first!")
     
-    # Load documents
-    documents = load_documents(settings.knowledge_base_dir)
+    # Load documents (from S3 or local filesystem)
+    documents = load_documents()
     
     if len(documents) == 0:
         logger.error("No documents found in knowledge base!")
