@@ -102,7 +102,7 @@ def get_cached_response(question: str) -> Optional[Dict[str, Any]]:
                 client.delete(cache_key)
                 return None
         else:
-            logger.debug(f"Cache miss for query: {question[:50]}...")
+            logger.info(f"Cache miss for query: {question[:50]}...")
             return None
             
     except (RedisError, Exception) as e:

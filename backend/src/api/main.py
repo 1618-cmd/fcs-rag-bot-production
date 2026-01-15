@@ -35,6 +35,21 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Qdrant URL: {settings.qdrant_url}")
     
+    # Pre-initialize Redis connection (if configured)
+    if settings.redis_url:
+        logger.info("Pre-initializing Redis connection...")
+        try:
+            from ..services.cache import get_redis_client
+            redis_client = get_redis_client()
+            if redis_client:
+                logger.info("✅ Redis client pre-initialized successfully")
+            else:
+                logger.warning("⚠️  Redis client not available (caching disabled)")
+        except Exception as e:
+            logger.warning(f"⚠️  Redis pre-initialization failed: {e}. Caching may be disabled.")
+    else:
+        logger.info("Redis URL not configured - caching disabled")
+    
     # Pre-initialize RAG pipeline to eliminate cold start delay
     # This ensures the first user doesn't wait 10-25 seconds for initialization
     # Wrapped in try/except to ensure API starts even if initialization fails
