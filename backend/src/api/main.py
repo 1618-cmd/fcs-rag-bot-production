@@ -73,13 +73,23 @@ app = FastAPI(
     redoc_url="/api/redoc",
 )
 
-# CORS middleware (allow frontend to call API)
+# CORS middleware (restrict to frontend domain for security)
+# Build allowed origins list
+allowed_origins = [settings.frontend_url]
+
+# Add localhost for development
+if settings.environment == "development" or settings.debug:
+    allowed_origins.append("http://localhost:3000")
+    allowed_origins.append("http://127.0.0.1:3000")
+
+logger.info(f"CORS allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual frontend URL
+    allow_origins=allowed_origins,  # Only allow frontend domain
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Only needed HTTP methods
+    allow_headers=["Content-Type", "Authorization"],  # Only needed headers
 )
 
 # Include routers

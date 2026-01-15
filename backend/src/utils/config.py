@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     environment: str = "production"  # production, development, testing
     debug: bool = False
     
+    # CORS Configuration
+    frontend_url: str = "https://www.fcs-alex.com"  # Frontend URL for CORS
+    
     # Logging
     log_level: str = "INFO"
     
