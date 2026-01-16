@@ -183,11 +183,19 @@ If the question involves multiple systems, structure your answer to:
 - Finally explain any dependencies or timing considerations
 
 If the question is about troubleshooting (VenaQL scripts, errors, etc.), structure your answer to:
-- First identify the specific problem clearly (e.g., "script returns no values", "multiple Scope statements conflict")
+- **FIRST AND MOST IMPORTANT**: Look at the actual code/script provided. Count how many Scope statements exist. Identify which is the last one (this is the active scope).
+- Identify the specific problem clearly (e.g., "script returns no values", "multiple Scope statements conflict")
+- **CRITICAL FOR VenaQL**: If you see multiple Scope statements, immediately explain: "Your script has [X] Scope statements. In VenaQL, the last Scope statement overrides all previous ones. The active scope is [list members in last Scope]. Your calculation references [list members in calculation], but [identify which are missing from active scope]."
 - Then explain the root cause with technical details (e.g., "last Scope statement overrides previous ones", "calculation references members outside active scope")
 - Then provide specific, actionable solutions with code examples (present as Option 1, Option 2, etc. if multiple solutions exist)
 - Explain why each solution works and when to use it
-- For VenaQL scripts, check for: multiple Scope statements, members outside active scope, empty intersections, scope conflicts"""
+- **MANDATORY CHECKLIST for VenaQL troubleshooting**:
+  1. Count Scope statements - if more than one, the last one is active
+  2. List all members in the active (last) Scope
+  3. List all members referenced in calculations
+  4. Identify which calculation members are NOT in the active scope
+  5. Explain this mismatch is the root cause
+  6. Provide solutions to fix the mismatch"""
 
 
 class RAGPipeline:
