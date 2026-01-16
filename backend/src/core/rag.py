@@ -376,13 +376,25 @@ class RAGPipeline:
             
             # Escape curly braces in query to prevent template formatting errors
             # VenaQL scripts contain { } which conflict with prompt template syntax
+            # In Python format strings, {{ becomes { and }} becomes }
             escaped_query = query.replace("{", "{{").replace("}", "}}")
             
-            # Format the prompt
-            messages = self.prompt.format_messages(
-                context=context,
-                question=escaped_query
-            )
+            # Format the prompt - ChatPromptTemplate handles the escaping correctly
+            try:
+                messages = self.prompt.format_messages(
+                    context=context,
+                    question=escaped_query
+                )
+            except (KeyError, ValueError) as format_error:
+                # If escaping fails, try using invoke with direct message construction
+                logger.warning(f"Template formatting failed, using direct message construction: {format_error}")
+                from langchain_core.messages import SystemMessage, HumanMessage
+                system_text = SYSTEM_PROMPT.replace("{context}", context)
+                user_text = USER_PROMPT.replace("{question}", query)
+                messages = [
+                    SystemMessage(content=system_text),
+                    HumanMessage(content=user_text)
+                ]
             
             # Generate response
             response = self.llm.invoke(messages)
