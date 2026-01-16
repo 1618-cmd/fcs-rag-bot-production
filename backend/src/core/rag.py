@@ -374,10 +374,14 @@ class RAGPipeline:
         try:
             context = self.format_context(documents)
             
+            # Escape curly braces in query to prevent template formatting errors
+            # VenaQL scripts contain { } which conflict with prompt template syntax
+            escaped_query = query.replace("{", "{{").replace("}", "}}")
+            
             # Format the prompt
             messages = self.prompt.format_messages(
                 context=context,
-                question=query
+                question=escaped_query
             )
             
             # Generate response
