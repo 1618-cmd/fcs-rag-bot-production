@@ -67,9 +67,25 @@ async def query_rag(request: QueryRequest):
             # Fallback to synchronous version if async fails
             response, documents = pipeline.query(request.question)
         
-        # Extract sources
-        source_names = pipeline.get_sources(documents)
-        sources = [Source(name=name) for name in source_names]
+        # Check if the response indicates a refusal (missing information)
+        # If the LLM refused to answer, don't include sources
+        refusal_indicators = [
+            "do not contain sufficient information",
+            "context documents do not contain",
+            "does not contain information",
+            "would need documentation",
+            "insufficient information to answer"
+        ]
+        
+        is_refusal = any(indicator.lower() in response.lower() for indicator in refusal_indicators)
+        
+        # Extract sources only if not a refusal
+        if is_refusal:
+            logger.info("Response indicates refusal - excluding sources")
+            sources = []
+        else:
+            source_names = pipeline.get_sources(documents)
+            sources = [Source(name=name) for name in source_names]
         
         # Calculate latency
         latency_ms = (time.time() - start_time) * 1000
