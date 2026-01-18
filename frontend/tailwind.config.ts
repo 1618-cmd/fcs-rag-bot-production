@@ -5,6 +5,7 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",  // Add this line
   ],
   theme: {
     extend: {
@@ -18,6 +19,8 @@ const config: Config = {
     },
   },
   plugins: [],
+  // Add this to force Tailwind to rebuild
+  safelist: ['max-w-2xl', 'max-w-3xl', 'mx-auto'],
 };
 export default config;
 

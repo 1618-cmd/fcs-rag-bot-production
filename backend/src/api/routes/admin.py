@@ -1,0 +1,239 @@
+"""
+Admin endpoints for document approval workflow.
+"""
+
+import logging
+from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from pydantic import BaseModel
+
+from ...services.s3_documents import (
+    get_pending_documents,
+    get_approved_documents,
+    get_archived_documents,
+    approve_document,
+    reject_document,
+    upload_document_to_staging
+)
+from ...utils.config import settings
+from .auth import get_current_user
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+class DocumentInfo(BaseModel):
+    """Document information model."""
+    key: str
+    name: str
+    path: str
+    size: int
+    last_modified: str
+    status: Optional[str] = None
+
+
+class ApproveRequest(BaseModel):
+    """Request model for approving a document."""
+    document_key: str
+
+
+class RejectRequest(BaseModel):
+    """Request model for rejecting a document."""
+    document_key: str
+    reason: Optional[str] = None
+
+
+@router.get("/documents/pending", response_model=List[DocumentInfo])
+async def get_pending(current_user: Optional[str] = Depends(get_current_user)):
+    """
+    Get list of all pending documents in staging folder.
+    
+    Returns list of documents awaiting approval.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        if not settings.use_s3 or not settings.s3_bucket_name:
+            raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
+        
+        documents = get_pending_documents()
+        return [
+            DocumentInfo(
+                key=doc['key'],
+                name=doc['name'],
+                path=doc['path'],
+                size=doc['size'],
+                last_modified=doc['last_modified'],
+                status='pending'
+            )
+            for doc in documents
+        ]
+    except Exception as e:
+        logger.error(f"Error getting pending documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting pending documents: {str(e)}")
+
+
+@router.get("/documents/approved", response_model=List[DocumentInfo])
+async def get_approved(current_user: Optional[str] = Depends(get_current_user)):
+    """
+    Get list of all approved documents.
+    
+    Returns list of documents that have been approved and are ready for ingestion.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        if not settings.use_s3 or not settings.s3_bucket_name:
+            raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
+        
+        documents = get_approved_documents()
+        return [
+            DocumentInfo(
+                key=doc['key'],
+                name=doc['name'],
+                path=doc['path'],
+                size=doc['size'],
+                last_modified=doc['last_modified'],
+                status='approved'
+            )
+            for doc in documents
+        ]
+    except Exception as e:
+        logger.error(f"Error getting approved documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting approved documents: {str(e)}")
+
+
+@router.get("/documents/archived", response_model=List[DocumentInfo])
+async def get_archived(current_user: Optional[str] = Depends(get_current_user)):
+    """
+    Get list of all archived/rejected documents.
+    
+    Returns list of documents that have been rejected.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        if not settings.use_s3 or not settings.s3_bucket_name:
+            raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
+        
+        documents = get_archived_documents()
+        return [
+            DocumentInfo(
+                key=doc['key'],
+                name=doc['name'],
+                path=doc['path'],
+                size=doc['size'],
+                last_modified=doc['last_modified'],
+                status='rejected'
+            )
+            for doc in documents
+        ]
+    except Exception as e:
+        logger.error(f"Error getting archived documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting archived documents: {str(e)}")
+
+
+@router.post("/documents/approve")
+async def approve(request: ApproveRequest, current_user: Optional[str] = Depends(get_current_user)):
+    """
+    Approve a document by moving it from staging to approved folder.
+    
+    After approval, document will be available for ingestion.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        if not settings.use_s3 or not settings.s3_bucket_name:
+            raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
+        
+        success = approve_document(request.document_key)
+        if not success:
+            raise HTTPException(status_code=400, detail=f"Failed to approve document: {request.document_key}")
+        
+        return {
+            "success": True,
+            "message": f"Document approved: {request.document_key}",
+            "document_key": request.document_key
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving document: {e}")
+        raise HTTPException(status_code=500, detail=f"Error approving document: {str(e)}")
+
+
+@router.post("/documents/reject")
+async def reject(request: RejectRequest, current_user: Optional[str] = Depends(get_current_user)):
+    """
+    Reject a document by moving it from staging to archive folder.
+    
+    Rejected documents are archived and will not be ingested.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        if not settings.use_s3 or not settings.s3_bucket_name:
+            raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
+        
+        success = reject_document(request.document_key)
+        if not success:
+            raise HTTPException(status_code=400, detail=f"Failed to reject document: {request.document_key}")
+        
+        return {
+            "success": True,
+            "message": f"Document rejected: {request.document_key}",
+            "document_key": request.document_key,
+            "reason": request.reason
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rejecting document: {e}")
+        raise HTTPException(status_code=500, detail=f"Error rejecting document: {str(e)}")
+
+
+@router.post("/documents/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    current_user: Optional[str] = Depends(get_current_user)
+):
+    """
+    Upload a document to the staging folder for approval.
+    
+    The uploaded file will be placed in the staging folder and require approval
+    before being available for ingestion.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        if not settings.use_s3 or not settings.s3_bucket_name:
+            raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
+        
+        # Read file content
+        file_content = await file.read()
+        
+        if not file_content:
+            raise HTTPException(status_code=400, detail="File is empty")
+        
+        # Upload to S3 staging
+        s3_key = upload_document_to_staging(file_content, file.filename or "document")
+        
+        return {
+            "success": True,
+            "message": f"Document uploaded successfully: {file.filename}",
+            "document_key": s3_key,
+            "filename": file.filename
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error uploading document: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading document: {str(e)}")

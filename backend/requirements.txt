@@ -44,3 +44,6 @@ pytest-asyncio==0.23.3
 
 # Jira Integration (for CSV import script)
 jira==3.5.2
+
+# Authentication (JWT)
+PyJWT>=2.8.0

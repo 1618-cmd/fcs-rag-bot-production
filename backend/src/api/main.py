@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from ..utils.config import settings, validate_settings
 from ..utils.logging_config import setup_logging
-from .routes import query, health, ingestion
+from .routes import query, health, ingestion, jira, admin, auth
 
 # Set up logging
 setup_logging(log_level=settings.log_level)
@@ -125,6 +125,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(query.router, prefix="/api", tags=["Query"])
 app.include_router(ingestion.router, prefix="/api", tags=["Ingestion"])
+app.include_router(jira.router, prefix="/api", tags=["Jira"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 
 @app.get("/")

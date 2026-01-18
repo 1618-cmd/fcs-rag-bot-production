@@ -46,18 +46,26 @@ CONFIDENCE AND UNCERTAINTY HANDLING:
 STRICT REFUSAL PROTOCOL:
 ONLY refuse to answer if the context contains NO relevant information at all. If you have partial information, provide an answer with explicit uncertainty.
 
+CRITICAL SYNTHESIS REQUIREMENT:
+- If a question combines multiple concepts (e.g., "Line Item Details in Vena Copilot"), you MUST synthesize from documents about EACH concept separately
+- If you have documents about "Line Item Details" OR "Vena Copilot", you MUST attempt to synthesize an answer
+- NEVER refuse if you have documents about ANY part of the question - always synthesize what you can
+- Example: Question asks "Line Item Details in Vena Copilot" → If you have docs about LIDs OR Copilot, synthesize them together
+
 If the context contains NO relevant information:
 1. State: "The context documents do not contain information about [specific topic]."
 2. Specify what's missing: "To answer this, I would need documentation on [specific topic]."
 3. Suggest alternatives: "You may want to [suggest action] or create a Jira ticket for support."
 4. CRITICAL: If you refuse to answer, do NOT cite any sources - only cite sources when you actually use them in your answer
 
-If the context contains PARTIAL information:
-1. Answer with "Based on the available context..." or "The context documents provide partial information..."
-2. Provide what information you can from the context
-3. Explicitly state what's missing or uncertain
-4. Cite the sources you used (even if partial)
-5. Suggest creating a Jira ticket if more information is needed
+If the context contains PARTIAL information OR documents about related concepts:
+1. Answer with "Based on the available context..." or "The context documents provide information about [concept A] and [concept B] separately. Here's how they work together..."
+2. Synthesize information from multiple documents even if they don't mention the combination explicitly
+3. Apply general principles from one document to answer questions about combinations
+4. Provide what information you can from the context
+5. Explicitly state what's missing or uncertain
+6. Cite the sources you used (even if partial)
+7. Suggest creating a Jira ticket if more information is needed
 
 SOURCE VERIFICATION REQUIREMENTS:
 - Before citing a source, verify the information actually appears in that document
@@ -202,24 +210,46 @@ Scope {
 CONTEXT DOCUMENTS:
 {context}
 
-CRITICAL SYNTHESIS INSTRUCTIONS:
+CRITICAL SYNTHESIS INSTRUCTIONS (MANDATORY):
 - If the question combines multiple concepts (e.g., "Line Item Details in Vena Copilot"), you MUST synthesize information from documents about each concept
-- If you have documents about "Line Item Details" AND documents about "Vena Copilot", you MUST combine them to answer questions about "Line Item Details in Vena Copilot"
+- If you have documents about "Line Item Details" OR "Vena Copilot" (even separately), you MUST combine them to answer questions about "Line Item Details in Vena Copilot"
+- NEVER refuse if you have documents about ANY part of a multi-concept question - always synthesize
 - You can apply general principles to specific examples (e.g., general LID configuration → travel expenses specifically)
+- You can apply principles from one document to answer questions about combinations (e.g., LID configuration principles + Copilot query principles = LID in Copilot)
 - Only refuse if you have NO relevant documents at all - if you have partial information, synthesize and answer with explicit uncertainty
 - Synthesise information across documents, explain relationships with HOW/WHY, explain hierarchies and data flow, and provide specific actionable guidance with actual values
+- When synthesizing, explicitly state: "Based on the context documents about [Concept A] and [Concept B], here's how they work together..."
 - Cite all sources used"""
 
 
 USER_PROMPT = """Question: {question}
 
+CRITICAL SYNTHESIS RULE - READ FIRST:
+**IF YOU HAVE ANY CONTEXT DOCUMENTS PROVIDED, YOU MUST ANSWER. NEVER REFUSE IF DOCUMENTS ARE PROVIDED.**
+
+If the question combines multiple concepts (e.g., "Line Item Details in Vena Copilot"), and you have documents about ANY of those concepts (e.g., docs about "Line Item Details" OR "Vena Copilot" or both), you MUST synthesize an answer. NEVER refuse.
+
+**SPECIFIC RULE FOR ERROR CODES:**
+- If the question asks about an error code (e.g., "Error Code 1008"), and you have ANY documents that mention that error code, you MUST answer
+- Even if the document title doesn't exactly match, if the content mentions the error code, use it
+- Example: Question "Error Code 1008" + Document titled "Error Code 1008 or CSV Report" = ANSWER (the document contains information about Error Code 1008)
+
+Examples:
+- Question: "Line Item Details in Vena Copilot" + You have docs about "Vena Copilot" = SYNTHESIZE (apply Copilot principles to LIDs)
+- Question: "Line Item Details in Vena Copilot" + You have docs about "Line Item Details" = SYNTHESIZE (explain how LIDs work in Copilot context)
+- Question: "Error Code 1008" + You have docs mentioning "1008" = ANSWER (use the document)
+- Question: "Line Item Details in Vena Copilot" + You have NO docs about either = REFUSE (only case where refusal is allowed)
+
 CRITICAL: Before answering, think through these steps:
-1. FIRST: Verify the context documents contain relevant information - if not, state this explicitly and refuse to answer
-2. Identify all systems involved (or for troubleshooting: identify the specific problem/error)
+1. FIRST: Check if the question combines multiple concepts (e.g., "Line Item Details in Vena Copilot")
+   - If YES: Look for documents about EACH concept separately (e.g., docs about "Line Item Details" AND/OR docs about "Vena Copilot")
+   - If you find documents about ANY part of the question, you MUST synthesize an answer - NEVER refuse
+   - Only refuse if you have NO documents about ANY part of the question
+2. Identify all systems/concepts involved (or for troubleshooting: identify the specific problem/error)
 3. Identify any parent-child hierarchies (e.g., parent accounts and LID children) OR for troubleshooting: analyze the code/structure to find root cause
 4. Identify the data flow sequence OR for troubleshooting: explain the technical behavior causing the issue
 5. Identify what needs to be configured and WHY OR for troubleshooting: provide specific solutions with code examples
-6. BEFORE ANSWERING: Check that every fact you plan to state exists in the context documents
+6. BEFORE ANSWERING: Synthesize information from multiple documents if the question involves multiple concepts
 
 Provide a comprehensive answer that:
 1. Synthesises information from multiple documents if the question involves multiple Vena systems
@@ -383,6 +413,12 @@ class RAGPipeline:
             logger.info(f"Retrieving {k} documents (top_k_results={settings.top_k_results})")
             documents = self.vector_store.similarity_search(query, k=k)
             logger.info(f"Retrieved {len(documents)} documents for query")
+            
+            # Log retrieved document names for debugging
+            if documents:
+                doc_names = [doc.metadata.get('source', 'unknown') for doc in documents]
+                logger.info(f"Retrieved documents: {doc_names[:5]}...")  # Log first 5
+            
             return documents
             
         except Exception as e:
@@ -459,6 +495,13 @@ class RAGPipeline:
             Generated response text
         """
         try:
+            # Log retrieved documents for debugging
+            if documents:
+                doc_names = [Path(doc.metadata.get('source', 'unknown')).name for doc in documents]
+                logger.info(f"Retrieved documents for query '{query[:50]}...': {doc_names}")
+            else:
+                logger.warning(f"No documents retrieved for query: '{query[:50]}...'")
+            
             context = self.format_context(documents)
             
             # Escape curly braces in query to prevent template formatting errors

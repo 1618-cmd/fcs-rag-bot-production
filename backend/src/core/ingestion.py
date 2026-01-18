@@ -150,7 +150,12 @@ def load_documents(knowledge_base_path: Optional[Path] = None) -> List:
     if settings.use_s3:
         if not settings.s3_bucket_name:
             raise ValueError("S3_BUCKET_NAME must be set when USE_S3 is True")
-        return load_documents_from_s3(settings.s3_bucket_name, settings.s3_prefix)
+        # Use approved prefix if configured, otherwise use base prefix
+        s3_prefix = settings.s3_approved_prefix or settings.s3_prefix
+        # If approved prefix is empty but base prefix is set, default to approved subfolder
+        if not s3_prefix and settings.s3_prefix:
+            s3_prefix = f"{settings.s3_prefix}approved/"
+        return load_documents_from_s3(settings.s3_bucket_name, s3_prefix)
     
     # Otherwise, use local filesystem
     if knowledge_base_path is None:

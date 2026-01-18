@@ -69,3 +69,8 @@ Thumbs.db
 # Large files that exceed GitHub's 100MB limit
 knowledge_base/Miles Documentation/Drill Down Export.csv
 
+# AWS credentials (never commit these!)
+*accessKeys.csv
+*_accessKeys.csv
+fcs-rag-bot-s3-access_accessKeys.csv
+

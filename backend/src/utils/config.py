@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"  # Default AWS region
     s3_bucket_name: Optional[str] = None
     s3_prefix: str = ""  # Optional prefix/folder in S3 bucket
+    s3_staging_prefix: str = ""  # Staging folder (default: knowledge_base/staging/)
+    s3_approved_prefix: str = ""  # Approved folder (default: knowledge_base/approved/)
+    s3_archive_prefix: str = ""  # Archive folder (default: knowledge_base/archive/)
     
     # Ingestion API Key (optional - for securing the /api/ingest endpoint)
     ingestion_api_key: Optional[str] = None
@@ -60,6 +63,20 @@ class Settings(BaseSettings):
     
     # CORS Configuration
     frontend_url: str = "https://www.fcs-alex.com"  # Frontend URL for CORS
+    
+    # Jira Configuration (optional - for ticket creation)
+    jira_server_url: Optional[str] = None  # e.g., "https://yourcompany.atlassian.net"
+    jira_email: Optional[str] = None  # Jira account email
+    jira_api_token: Optional[str] = None  # Jira API token (from https://id.atlassian.com/manage-profile/security/api-tokens)
+    jira_project_key: Optional[str] = None  # e.g., "SUPPORT"
+    jira_issue_type: str = "Task"  # Default issue type (Task, Bug, Story, etc.)
+    jira_labels: Optional[str] = None  # Comma-separated labels (e.g., "rag-bot,support")
+    
+    # Authentication Configuration (simple auth, no database)
+    jwt_secret_key: str = "your-secret-key-change-in-production"  # JWT secret key
+    admin_email: str = "admin@example.com"  # Admin email for login
+    admin_password: str = "admin"  # Admin password (change in production!)
+    jira_labels: str = "rag-bot,support"  # Comma-separated labels for created tickets
     
     # Logging
     log_level: str = "INFO"

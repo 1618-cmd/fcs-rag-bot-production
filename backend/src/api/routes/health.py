@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ...utils.config import settings
-from ...services.cache import get_cache_stats
+from ...services.cache import get_cache_stats, clear_cache
 
 router = APIRouter()
 
@@ -116,3 +116,23 @@ async def cache_stats():
     """
     stats = get_cache_stats()
     return stats
+
+
+@router.post("/health/cache/clear")
+async def clear_cache_endpoint():
+    """
+    Clear all cached query responses.
+    
+    Useful after knowledge base updates to force fresh responses.
+    """
+    try:
+        clear_cache()
+        return {
+            "status": "success",
+            "message": "Cache cleared successfully"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to clear cache: {str(e)}"
+        }

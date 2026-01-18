@@ -161,9 +161,16 @@ def format_text_with_markdown(paragraph, text):
             paragraph.add_run(part)
 
 if __name__ == '__main__':
+    import sys
     project_root = Path(__file__).parent.parent
-    md_file = project_root / 'ARCHITECTURE.md'
-    output_file = project_root / 'ARCHITECTURE.docx'
+    
+    # Accept command line arguments or use defaults
+    if len(sys.argv) >= 3:
+        md_file = project_root / sys.argv[1]
+        output_file = project_root / sys.argv[2]
+    else:
+        md_file = project_root / 'ARCHITECTURE.md'
+        output_file = project_root / 'ARCHITECTURE.docx'
     
     if not md_file.exists():
         print(f"Error: {md_file} not found!")

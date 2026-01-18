@@ -11,7 +11,7 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   color: rgb(var(--foreground-rgb));
-  background: #F5F5F4;
+  background: #FFFFFF;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -20,6 +20,15 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Ensure navigation buttons are white with no borders */
+button {
+  background-color: transparent;
+}
+
+button.bg-white {
+  background-color: white !important;
 }
 
 /* Smooth scrolling */
