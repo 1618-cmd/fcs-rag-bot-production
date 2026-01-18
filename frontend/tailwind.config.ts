@@ -18,10 +18,13 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
-  // Add this to force Tailwind to rebuild
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
+  // Add safelist via type assertion (valid Tailwind option, not in TS types)
   safelist: ['max-w-2xl', 'max-w-3xl', 'mx-auto'],
-};
+} as Config & { safelist?: string[] };
+
 export default config;
 
 
