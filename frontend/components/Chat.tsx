@@ -121,9 +121,9 @@ export default function Chat() {
       {messages.length > 0 && (
         <>
           {/* Messages Area - Scrollable */}
-          <div className="flex-1 overflow-y-auto pb-32">
+          <div className="flex-1 overflow-y-auto" style={{ paddingBottom: '140px' }}>
             <Container size="md">
-              <div className="py-8">
+              <div className="py-8 overflow-x-hidden">
                 {messages.map((message, index) => (
                   <ChatMessage
                     key={index}
@@ -157,7 +157,14 @@ export default function Chat() {
           {/* Input Box - Fixed at Bottom, Clean ChatGPT style */}
           <div 
             className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-4"
-            style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50 }}
+            style={{ 
+              position: 'fixed', 
+              bottom: 0, 
+              left: 0, 
+              right: 0, 
+              zIndex: 50,
+              backgroundColor: '#ffffff'
+            }}
           >
             <Container size="md">
               <div className="relative flex items-center bg-gray-100 rounded-full px-4 hover:bg-gray-200 transition">

@@ -34,7 +34,7 @@ export default function ChatMessage({ message, onFeedback, onCreateTicket }: Cha
     return (
       <div className="flex justify-end mb-6">
         <div className="bg-gray-100 rounded-2xl px-5 py-3 max-w-[80%]">
-          <p className="text-base text-gray-900 whitespace-pre-wrap">{message.content}</p>
+          <p className="text-base text-gray-900 whitespace-pre-wrap" style={{ lineHeight: '1.75' }}>{message.content}</p>
         </div>
       </div>
     );
@@ -43,7 +43,7 @@ export default function ChatMessage({ message, onFeedback, onCreateTicket }: Cha
   return (
     <div className="mb-8">
       {/* Assistant Message Content */}
-      <div className="prose prose-gray max-w-none">
+      <div className="prose prose-gray max-w-none break-words overflow-wrap-anywhere">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
@@ -65,12 +65,12 @@ export default function ChatMessage({ message, onFeedback, onCreateTicket }: Cha
               // Fallback to default pre rendering
               return <pre {...props}>{children}</pre>;
             },
-            // Custom inline code rendering
+            // Custom inline code rendering - ChatGPT: 14px (0.875rem)
             code({ node, inline, className, children, ...props }: any) {
               // This should only handle inline code now
               if (inline) {
                 return (
-                  <code className="bg-gray-100 text-red-600 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                  <code className="bg-gray-100 text-red-600 px-1.5 py-0.5 rounded text-sm font-mono" style={{ fontSize: '14px' }} {...props}>
                     {children}
                   </code>
                 );
@@ -93,19 +93,19 @@ export default function ChatMessage({ message, onFeedback, onCreateTicket }: Cha
                 }
               }
               
-              // Normal paragraph
+              // Normal paragraph - ChatGPT: 16px, line-height 1.75
               return (
-                <p className="text-base text-gray-900 leading-relaxed my-3" {...props}>
+                <p className="text-base text-gray-900 my-3" style={{ lineHeight: '1.75' }} {...props}>
                   {children}
                 </p>
               );
             },
-            // Style headers
+            // Style headers - ChatGPT: H2 = 20px (1.25rem) Bold, H3 = 18px (1.125rem) Bold
             h2: ({ children }) => (
-              <h2 className="text-xl font-semibold text-gray-900 mt-6 mb-3">{children}</h2>
+              <h2 className="text-xl font-bold text-gray-900 mt-6 mb-3">{children}</h2>
             ),
             h3: ({ children }) => (
-              <h3 className="text-lg font-semibold text-gray-900 mt-4 mb-2">{children}</h3>
+              <h3 className="text-lg font-bold text-gray-900 mt-4 mb-2">{children}</h3>
             ),
             // Style lists
             ul: ({ children }) => (
@@ -142,10 +142,10 @@ export default function ChatMessage({ message, onFeedback, onCreateTicket }: Cha
         </ReactMarkdown>
       </div>
 
-      {/* Source Citations */}
+      {/* Source Citations - ChatGPT: UI text 14px */}
       {message.sources && message.sources.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-xs font-medium text-gray-600 mb-2">Sources:</p>
+          <p className="text-sm font-medium text-gray-600 mb-2">Sources:</p>
           <div className="flex flex-wrap gap-2">
             {message.sources.map((source, idx) => {
               // Clean up source name - remove Windows paths and extract just the document name
@@ -160,7 +160,7 @@ export default function ChatMessage({ message, onFeedback, onCreateTicket }: Cha
               return (
                 <span
                   key={idx}
-                  className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded"
+                  className="text-sm px-2 py-1 bg-gray-100 text-gray-700 rounded"
                   title={source.name}
                 >
                   {cleanSourceName}

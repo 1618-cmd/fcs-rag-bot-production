@@ -18,7 +18,7 @@ export default function CodeBlock({ language, value }: CodeBlockProps) {
   };
 
   return (
-    <div className="relative group my-4">
+    <div className="relative group my-4 overflow-x-auto">
       {/* Language label and copy button */}
       <div className="flex items-center justify-between bg-gray-800 text-gray-300 px-4 py-2 text-xs font-mono rounded-t-lg">
         <span className="uppercase">{language || 'code'}</span>
@@ -45,7 +45,7 @@ export default function CodeBlock({ language, value }: CodeBlockProps) {
         </button>
       </div>
 
-      {/* Code block */}
+      {/* Code block - ChatGPT: 14px (0.875rem) */}
       <SyntaxHighlighter
         language={language || 'text'}
         style={vscDarkPlus}
@@ -55,6 +55,9 @@ export default function CodeBlock({ language, value }: CodeBlockProps) {
           borderTopRightRadius: 0,
           borderBottomLeftRadius: '0.5rem',
           borderBottomRightRadius: '0.5rem',
+          overflowX: 'auto',
+          maxWidth: '100%',
+          fontSize: '14px',
         }}
       >
         {value}

@@ -30,9 +30,10 @@ export default function Container({
         maxWidth: sizeMap[size], 
         margin: '0 auto', 
         padding: '0 24px',
-        width: '100%'
+        width: '100%',
+        boxSizing: 'border-box'
       }}
-      className={className}
+      className={`${className} overflow-x-hidden`}
     >
       {children}
     </div>
