@@ -20,6 +20,7 @@ class QueryRequest(BaseModel):
     """Request model for RAG query."""
     question: str = Field(..., description="The question to ask", min_length=1, max_length=10000)  # Increased to support long code snippets
     top_k: Optional[int] = Field(None, description="Number of documents to retrieve (default: 5)", ge=1, le=10)
+    skip_cache: bool = Field(default=False, description="Skip cache and force fresh response")
 
 
 class Source(BaseModel):
@@ -46,12 +47,15 @@ async def query_rag(request: QueryRequest):
     start_time = time.time()
     
     try:
-        # Check cache first
-        cached_response = get_cached_response(request.question)
-        if cached_response:
-            # Return cached response (much faster!)
-            logger.info(f"Returning cached response (saved {cached_response.get('latency_ms', 0)}ms)")
-            return QueryResponse(**cached_response)
+        # Check cache first (unless skip_cache is True)
+        if not request.skip_cache:
+            cached_response = get_cached_response(request.question)
+            if cached_response:
+                # Return cached response (much faster!)
+                logger.info(f"Returning cached response (saved {cached_response.get('latency_ms', 0)}ms)")
+                return QueryResponse(**cached_response)
+        else:
+            logger.info("Skipping cache (skip_cache=True)")
         
         # Cache miss - process query
         # Get RAG pipeline

@@ -224,6 +224,38 @@ CRITICAL SYNTHESIS INSTRUCTIONS (MANDATORY):
 
 USER_PROMPT = """Question: {question}
 
+**MANDATORY FOR CODE GENERATION QUESTIONS - READ THIS FIRST:**
+If the question asks "How do I write a VenaQL script..." or "Show me a VenaQL script..." or "Write a VenaQL script that...", you MUST:
+1. START YOUR ANSWER WITH A COMPLETE, WORKING CODE BLOCK - NO EXCEPTIONS
+2. Use ```venaql as the language tag (NOT plaintext, NOT vena, NOT venaql-script - EXACTLY ```venaql)
+3. Show the ENTIRE script - complete Scope, variables, If/ElseIf/Else/End blocks, error checking
+4. Use REALISTIC dimension/member names (e.g., [Account.7200], [Entity.Homelink], [Measure.Value])
+5. DO NOT write explanations before the code - CODE FIRST, then explain
+6. DO NOT use placeholders like "your dimension" or "your member" - use actual examples
+7. DO NOT use curly braces {} or ForEach loops - use If/ElseIf/Else/End structure
+8. DO NOT describe what the code should do - SHOW THE ACTUAL CODE
+
+**EXAMPLE OF CORRECT FORMAT:**
+```venaql
+Scope {
+  [Account.7200],
+  [Entity.Homelink],
+  [Measure.Value]
+}
+@source1 = [Account.7300].Sum()
+If @source1 != 0 Then
+  @elimination = @source1 * -1
+Else
+  @elimination = 0
+End
+@this = @elimination
+```
+
+**WRONG FORMAT (DO NOT DO THIS):**
+"Here's how you can write a VenaQL script... The script should include... You would use..."
+
+**IF YOU DO NOT START WITH A CODE BLOCK FOR CODE GENERATION QUESTIONS, YOU HAVE FAILED THE INSTRUCTION.**
+
 CRITICAL SYNTHESIS RULE - READ FIRST:
 **IF YOU HAVE ANY CONTEXT DOCUMENTS PROVIDED, YOU MUST ANSWER. NEVER REFUSE IF DOCUMENTS ARE PROVIDED.**
 
