@@ -47,3 +47,10 @@ jira==3.5.2
 
 # Authentication (JWT)
 PyJWT>=2.8.0
+bcrypt>=4.0.1,<5.0.0
+
+# Rate Limiting
+slowapi>=0.1.9
+
+# Monitoring & Error Tracking
+sentry-sdk[fastapi]>=2.0.0
