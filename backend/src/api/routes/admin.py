@@ -16,7 +16,8 @@ from ...services.s3_documents import (
     upload_document_to_staging
 )
 from ...utils.config import settings
-from .auth import get_current_user
+from .auth import get_current_user_info
+from qdrant_client import QdrantClient
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -44,14 +45,16 @@ class RejectRequest(BaseModel):
 
 
 @router.get("/documents/pending", response_model=List[DocumentInfo])
-async def get_pending(current_user: Optional[str] = Depends(get_current_user)):
+async def get_pending(user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Get list of all pending documents in staging folder.
     
     Returns list of documents awaiting approval.
     """
-    if not current_user:
+    if not user_info:
         raise HTTPException(status_code=401, detail="Authentication required")
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
     
     try:
         if not settings.use_s3 or not settings.s3_bucket_name:
@@ -75,15 +78,13 @@ async def get_pending(current_user: Optional[str] = Depends(get_current_user)):
 
 
 @router.get("/documents/approved", response_model=List[DocumentInfo])
-async def get_approved(current_user: Optional[str] = Depends(get_current_user)):
+async def get_approved():
     """
-    Get list of all approved documents.
+    Get list of all approved documents (knowledge base contents).
     
     Returns list of documents that have been approved and are ready for ingestion.
+    This endpoint is read-only and does not require authentication for viewing.
     """
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
     try:
         if not settings.use_s3 or not settings.s3_bucket_name:
             raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
@@ -106,14 +107,16 @@ async def get_approved(current_user: Optional[str] = Depends(get_current_user)):
 
 
 @router.get("/documents/archived", response_model=List[DocumentInfo])
-async def get_archived(current_user: Optional[str] = Depends(get_current_user)):
+async def get_archived(user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Get list of all archived/rejected documents.
     
     Returns list of documents that have been rejected.
     """
-    if not current_user:
+    if not user_info:
         raise HTTPException(status_code=401, detail="Authentication required")
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
     
     try:
         if not settings.use_s3 or not settings.s3_bucket_name:
@@ -137,14 +140,16 @@ async def get_archived(current_user: Optional[str] = Depends(get_current_user)):
 
 
 @router.post("/documents/approve")
-async def approve(request: ApproveRequest, current_user: Optional[str] = Depends(get_current_user)):
+async def approve(request: ApproveRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Approve a document by moving it from staging to approved folder.
     
     After approval, document will be available for ingestion.
     """
-    if not current_user:
+    if not user_info:
         raise HTTPException(status_code=401, detail="Authentication required")
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
     
     try:
         if not settings.use_s3 or not settings.s3_bucket_name:
@@ -167,14 +172,16 @@ async def approve(request: ApproveRequest, current_user: Optional[str] = Depends
 
 
 @router.post("/documents/reject")
-async def reject(request: RejectRequest, current_user: Optional[str] = Depends(get_current_user)):
+async def reject(request: RejectRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Reject a document by moving it from staging to archive folder.
     
     Rejected documents are archived and will not be ingested.
     """
-    if not current_user:
+    if not user_info:
         raise HTTPException(status_code=401, detail="Authentication required")
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
     
     try:
         if not settings.use_s3 or not settings.s3_bucket_name:
@@ -200,7 +207,7 @@ async def reject(request: RejectRequest, current_user: Optional[str] = Depends(g
 @router.post("/documents/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    current_user: Optional[str] = Depends(get_current_user)
+    user_info: Optional[dict] = Depends(get_current_user_info)
 ):
     """
     Upload a document to the staging folder for approval.
@@ -208,8 +215,10 @@ async def upload_document(
     The uploaded file will be placed in the staging folder and require approval
     before being available for ingestion.
     """
-    if not current_user:
+    if not user_info:
         raise HTTPException(status_code=401, detail="Authentication required")
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
     
     try:
         if not settings.use_s3 or not settings.s3_bucket_name:

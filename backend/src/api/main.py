@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from ..utils.config import settings, validate_settings
 from ..utils.logging_config import setup_logging
-from .routes import query, health, ingestion, jira, admin, auth
+from .routes import query, health, ingestion, jira, admin, auth, users
 
 # Set up logging
 setup_logging(log_level=settings.log_level)
@@ -34,6 +34,18 @@ async def lifespan(app: FastAPI):
     logger.info("Configuration validated successfully")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Qdrant URL: {settings.qdrant_url}")
+    
+    # Pre-initialize database connection (if configured)
+    if settings.database_url:
+        logger.info("Pre-initializing database connection...")
+        try:
+            from ..services.database import init_database
+            init_database()
+            logger.info("✅ Database connection pre-initialized successfully")
+        except Exception as e:
+            logger.warning(f"⚠️  Database pre-initialization failed: {e}. Database features may be disabled.")
+    else:
+        logger.info("DATABASE_URL not configured - database features disabled")
     
     # Pre-initialize Redis connection (if configured)
     if settings.redis_url:
@@ -98,6 +110,11 @@ allowed_origins = [settings.frontend_url]
 if settings.environment == "development" or settings.debug:
     allowed_origins.append("http://localhost:3000")
     allowed_origins.append("http://127.0.0.1:3000")
+    # Next.js dev server may pick a different port if 3000 is occupied
+    allowed_origins.append("http://localhost:3001")
+    allowed_origins.append("http://127.0.0.1:3001")
+    allowed_origins.append("http://localhost:3002")
+    allowed_origins.append("http://127.0.0.1:3002")
 
 logger.info(f"CORS allowed origins: {allowed_origins}")
 
@@ -128,6 +145,7 @@ app.include_router(ingestion.router, prefix="/api", tags=["Ingestion"])
 app.include_router(jira.router, prefix="/api", tags=["Jira"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(users.router, prefix="/api", tags=["Users"])
 
 
 @app.get("/")
