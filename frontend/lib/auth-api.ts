@@ -18,6 +18,8 @@ export interface LoginResponse {
 export interface AuthStatus {
   authenticated: boolean;
   email?: string;
+  role?: string;
+  user_id?: string;
 }
 
 /**

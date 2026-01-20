@@ -22,7 +22,86 @@ import {
 } from '@/lib/admin-api';
 import { checkAuthStatus, logout, getAuthToken } from '@/lib/auth-api';
 
-type Tab = 'pending' | 'approved' | 'rejected' | 'all';
+// Knowledge Base View Component - organizes documents by folder
+const KnowledgeBaseView: React.FC<{
+  documents: Document[];
+  onPreview: (key: string) => void;
+}> = ({ documents, onPreview }) => {
+  // Group documents by folder path
+  const groupedByFolder = documents.reduce((acc, doc) => {
+    // Extract folder path (everything before the filename)
+    const pathParts = doc.path.split('/');
+    const folderPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : 'Root';
+    const filename = pathParts[pathParts.length - 1];
+    
+    if (!acc[folderPath]) {
+      acc[folderPath] = [];
+    }
+    acc[folderPath].push({ ...doc, filename });
+    return acc;
+  }, {} as Record<string, (Document & { filename: string })[]>);
+
+  // Sort folders alphabetically
+  const sortedFolders = Object.keys(groupedByFolder).sort();
+
+  return (
+    <div className="space-y-6 mb-6">
+      {sortedFolders.map((folderPath) => (
+        <div key={folderPath} className="border border-gray-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            {folderPath}
+            <span className="text-sm font-normal text-gray-500">
+              ({groupedByFolder[folderPath].length} {groupedByFolder[folderPath].length === 1 ? 'document' : 'documents'})
+            </span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {groupedByFolder[folderPath]
+              .sort((a, b) => a.filename.localeCompare(b.filename))
+              .map((document) => (
+                <div
+                  key={document.key}
+                  className="p-3 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition cursor-pointer"
+                  onClick={() => onPreview(document.key)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate" title={document.filename}>
+                        {document.filename}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(document.last_modified).toLocaleDateString()}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {(document.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPreview(document.key);
+                      }}
+                      className="ml-2 text-gray-400 hover:text-gray-600"
+                      title="Preview document"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+type Tab = 'pending' | 'approved' | 'rejected' | 'knowledge-base' | 'all';
 
 export const AdminDocumentsPage: React.FC = () => {
   const router = useRouter();
@@ -31,25 +110,31 @@ export const AdminDocumentsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
-  // Check authentication on mount (optional - don't redirect)
+  // Check authentication on mount (admin-only)
   useEffect(() => {
     const checkAuth = async () => {
       const status = await checkAuthStatus();
       setAuthenticated(status.authenticated);
+      const admin = status.authenticated && status.role === 'admin';
+      setIsAdmin(admin);
       setCheckingAuth(false);
-      // No redirect - page is accessible without login
+      if (!admin) {
+        router.push('/');
+      }
     };
     checkAuth();
-  }, []);
+  }, [router]);
 
   // Load documents when tab changes
   useEffect(() => {
+    if (checkingAuth || !isAdmin) return;
     loadDocuments();
-  }, [activeTab]);
+  }, [activeTab, checkingAuth, isAdmin]);
 
   const loadDocuments = async () => {
     setLoading(true);
@@ -62,6 +147,9 @@ export const AdminDocumentsPage: React.FC = () => {
         docs = await getApprovedDocuments();
       } else if (activeTab === 'rejected') {
         docs = await getArchivedDocuments();
+      } else if (activeTab === 'knowledge-base') {
+        // Knowledge Base shows all approved documents (same as approved tab)
+        docs = await getApprovedDocuments();
       } else {
         // All - combine all tabs
         const [pending, approved, archived] = await Promise.all([
@@ -131,6 +219,7 @@ export const AdminDocumentsPage: React.FC = () => {
     pending: 0,
     approved: 0,
     rejected: 0,
+    'knowledge-base': 0,
     all: 0,
   });
 
@@ -147,6 +236,7 @@ export const AdminDocumentsPage: React.FC = () => {
           pending: pending.length,
           approved: approved.length,
           rejected: archived.length,
+          'knowledge-base': approved.length, // Same as approved
           all: pending.length + approved.length + archived.length,
         });
       } catch (err) {
@@ -159,15 +249,21 @@ export const AdminDocumentsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white" style={{ paddingTop: 'calc(3.5rem + 2rem)' }}>
       <Container size="xl">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-            Document Management
-          </h1>
-          <p className="text-base text-gray-600">
-            Review and approve documents for the knowledge base
-          </p>
-        </div>
+        {checkingAuth ? (
+          <div className="text-center py-12 text-base text-gray-500">Checking permissions...</div>
+        ) : !isAdmin ? (
+          <div className="text-center py-12 text-base text-gray-500">Access denied.</div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+                Document Management
+              </h1>
+              <p className="text-base text-gray-600">
+                Review and approve documents for the knowledge base
+              </p>
+            </div>
 
         {/* Upload Form */}
         <div className="mb-6 p-6 bg-white border border-gray-200 rounded-lg">
@@ -235,7 +331,7 @@ export const AdminDocumentsPage: React.FC = () => {
         {/* Tabs */}
         <div className="mb-6 border-b border-gray-200">
           <div className="flex gap-4">
-            {(['pending', 'approved', 'rejected', 'all'] as Tab[]).map((tab) => (
+            {(['pending', 'approved', 'rejected', 'knowledge-base', 'all'] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -245,7 +341,7 @@ export const AdminDocumentsPage: React.FC = () => {
                     : 'border-transparent text-gray-600 hover:text-gray-900'
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)} ({tabCounts[tab]})
+                {tab === 'knowledge-base' ? 'Knowledge Base' : tab.charAt(0).toUpperCase() + tab.slice(1)} ({tabCounts[tab]})
               </button>
             ))}
           </div>
@@ -267,6 +363,9 @@ export const AdminDocumentsPage: React.FC = () => {
           <div className="text-center py-12 text-base text-gray-500">
             No documents in this category.
           </div>
+        ) : activeTab === 'knowledge-base' ? (
+          // Knowledge Base view: organized by folder structure
+          <KnowledgeBaseView documents={documents} onPreview={handlePreview} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {documents.map((document) => (
@@ -294,6 +393,8 @@ export const AdminDocumentsPage: React.FC = () => {
               Run Ingestion on Approved Documents
             </button>
           </div>
+        )}
+          </>
         )}
       </Container>
     </div>

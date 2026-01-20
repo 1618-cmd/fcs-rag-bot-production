@@ -1,7 +1,7 @@
 /**
  * Login Page
  * 
- * Login page for admin access.
+ * Login page for accessing Chat (and Admin, if permitted).
  * Accessible at /login
  */
 
@@ -26,8 +26,20 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      // Redirect to admin page after successful login
-      router.push('/admin/documents');
+      // ChatGPT-style: keep Home separate and open the app surface (Chat/Admin) in a new tab.
+      // This is triggered by a user gesture (form submit), so pop-up blockers are less likely to block it.
+      const next =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('next')
+          : null;
+      const target = next || '/chat';
+
+      if (typeof window !== 'undefined') {
+        window.open(target, '_blank', 'noopener,noreferrer');
+      }
+
+      // Return this tab back to Home so the landing page remains visible.
+      router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -43,10 +55,10 @@ export default function LoginPage() {
       <Container size="sm">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-            Welcome Back
+            Sign in
           </h1>
           <p className="text-base text-gray-600">
-            Sign in to your account
+            Enter your email and password to continue
           </p>
         </div>
 

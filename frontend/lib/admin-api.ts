@@ -50,12 +50,15 @@ export async function getPendingDocuments(): Promise<Document[]> {
 }
 
 /**
- * Get list of approved documents.
+ * Get list of approved documents (knowledge base contents).
+ * This endpoint is public and does not require authentication.
  */
 export async function getApprovedDocuments(): Promise<Document[]> {
   const response = await fetch(`${API_BASE_URL}/api/admin/documents/approved`, {
     method: 'GET',
-    headers: getAuthHeaders(),
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
 
   if (!response.ok) {

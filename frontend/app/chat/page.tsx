@@ -1,5 +1,10 @@
 import Chat from '@/components/Chat';
+import ChatGate from '@/components/ChatGate';
 
 export default function ChatPage() {
-  return <Chat />;
+  return (
+    <ChatGate>
+      <Chat />
+    </ChatGate>
+  );
 }
