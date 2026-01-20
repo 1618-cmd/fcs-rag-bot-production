@@ -16,9 +16,9 @@
    - Install Command: `npm install` (auto)
 
 3. **Set Environment Variables:**
-   - `NEXT_PUBLIC_API_URL` = Your Railway backend URL
-     - Example: `https://your-app.railway.app`
-     - Or use Railway's default domain
+   - `NEXT_PUBLIC_API_URL` = `https://fcs-rag-bot-production.onrender.com`
+     - This is your Render backend URL
+     - Required for production to connect to the backend
 
 4. **Deploy!**
    - Click "Deploy"
