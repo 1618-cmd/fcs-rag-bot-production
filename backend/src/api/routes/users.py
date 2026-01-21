@@ -137,25 +137,25 @@ async def create_user(
         raise HTTPException(status_code=403, detail="Permission 'manage_users' required")
     
     # Use current user's tenant if not specified
-    tenant_id = request.tenant_id or current_user_obj.tenant_id
+    tenant_id = body.tenant_id or current_user_obj.tenant_id
     
     # Validate role
-    if request.role not in ROLES:
-        raise HTTPException(status_code=400, detail=f"Invalid role: {request.role}. Valid roles: {', '.join(ROLES.keys())}")
+    if body.role not in ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}. Valid roles: {', '.join(ROLES.keys())}")
     
     # Check if email already exists
-    existing = get_user_by_email(db, request.email)
+    existing = get_user_by_email(db, body.email)
     if existing:
         raise HTTPException(status_code=400, detail="User with this email already exists")
     
     # Create user
     new_user = User(
         id=str(uuid.uuid4()),
-        email=request.email,
+        email=body.email,
         tenant_id=tenant_id,
-        role=request.role,
-        full_name=request.full_name,
-        password_hash=hash_password(request.password) if request.password else None,
+        role=body.role,
+        full_name=body.full_name,
+        password_hash=hash_password(body.password) if body.password else None,
         is_active=True
     )
     
@@ -245,11 +245,11 @@ async def assign_role(
         raise HTTPException(status_code=404, detail="User not found")
     
     # Validate role
-    if request.role not in ROLES:
-        raise HTTPException(status_code=400, detail=f"Invalid role: {request.role}")
+    if body.role not in ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}")
     
     # Update role
-    user.role = request.role
+    user.role = body.role
     db.commit()
     
     logger.info(f"Role '{body.role}' assigned to user {user.email} by {current_user}")
@@ -289,10 +289,10 @@ async def update_user(
         raise HTTPException(status_code=404, detail="User not found")
     
     # Update fields
-    if request.full_name is not None:
-        user.full_name = request.full_name
-    if request.is_active is not None:
-        user.is_active = request.is_active
+    if body.full_name is not None:
+        user.full_name = body.full_name
+    if body.is_active is not None:
+        user.is_active = body.is_active
     if body.role is not None:
         if body.role not in ROLES:
             raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}")
