@@ -6,6 +6,7 @@ import logging
 import jwt
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi import Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
