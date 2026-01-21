@@ -12,6 +12,7 @@ from ...core.rag import get_rag_pipeline
 from ...utils.config import settings
 from ...services.cache import get_cached_response, cache_response
 from ...services.kill_switch import is_kill_switch_enabled, get_kill_switch_message
+from ...services.rate_limiter import limit_query
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -92,6 +93,7 @@ class QueryResponse(BaseModel):
 
 
 @router.post("/query", response_model=QueryResponse)
+@limit_query()
 async def query_rag(request: QueryRequest):
     """
     Query the RAG system (JSON request).
@@ -110,6 +112,7 @@ async def query_rag(request: QueryRequest):
 
 
 @router.post("/query/upload", response_model=QueryResponse)
+@limit_query()
 async def query_rag_with_file(
     question: str = Form(...),
     calc_script: Optional[str] = Form(None),

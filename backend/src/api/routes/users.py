@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ...models.database import User, Tenant
 from ...services.database import get_db
 from .auth import get_current_user
+from ...services.rate_limiter import limit_user_management
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -114,6 +115,7 @@ class UserResponse(BaseModel):
 
 
 @router.post("/users", response_model=UserResponse)
+@limit_user_management()
 async def create_user(
     request: CreateUserRequest,
     db: Session = Depends(get_db),
@@ -174,6 +176,7 @@ async def create_user(
 
 
 @router.get("/users", response_model=List[UserResponse])
+@limit_user_management()
 async def list_users(
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)
@@ -209,6 +212,7 @@ async def list_users(
 
 
 @router.put("/users/{user_id}/role")
+@limit_user_management()
 async def assign_role(
     user_id: str,
     request: AssignRoleRequest,
@@ -251,6 +255,7 @@ async def assign_role(
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
+@limit_user_management()
 async def update_user(
     user_id: str,
     request: UpdateUserRequest,
@@ -304,6 +309,7 @@ async def update_user(
 
 
 @router.delete("/users/{user_id}")
+@limit_user_management()
 async def delete_user(
     user_id: str,
     db: Session = Depends(get_db),

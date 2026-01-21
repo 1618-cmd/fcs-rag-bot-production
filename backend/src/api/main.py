@@ -10,9 +10,13 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from ..utils.config import settings, validate_settings
 from ..utils.logging_config import setup_logging
+from ..services.rate_limiter import get_limiter, rate_limit_handler
 from .routes import query, health, ingestion, jira, admin, auth, users
 
 # Set up logging
@@ -117,6 +121,20 @@ if settings.environment == "development" or settings.debug:
     allowed_origins.append("http://127.0.0.1:3002")
 
 logger.info(f"CORS allowed origins: {allowed_origins}")
+
+# Add auth middleware to extract user_id from JWT (for rate limiting)
+from .middleware.auth_middleware import AuthMiddleware
+app.add_middleware(AuthMiddleware)
+
+# Add rate limiting middleware (if enabled)
+if settings.rate_limit_enabled:
+    limiter = get_limiter()
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+    app.add_middleware(SlowAPIMiddleware)
+    logger.info("Rate limiting middleware enabled")
+else:
+    logger.info("Rate limiting is disabled")
 
 app.add_middleware(
     CORSMiddleware,

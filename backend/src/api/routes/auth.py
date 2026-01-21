@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from ...utils.config import settings
 from ...services.database import get_db
 from ...models.database import User
+from ...services.rate_limiter import limit_login
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -108,6 +109,7 @@ async def get_current_user_info(
 
 
 @router.post("/login", response_model=LoginResponse)
+@limit_login()
 async def login(request: LoginRequest):
     """
     Login endpoint for users.
