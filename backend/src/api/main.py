@@ -27,6 +27,36 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown."""
+    # Initialize Sentry early (before other initialization)
+    if settings.sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.fastapi import FastApiIntegration
+            from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+            from sentry_sdk.integrations.logging import LoggingIntegration
+            
+            # Configure Sentry
+            sentry_sdk.init(
+                dsn=settings.sentry_dsn,
+                environment=settings.sentry_environment,
+                traces_sample_rate=settings.sentry_traces_sample_rate,  # 20% for performance
+                profiles_sample_rate=0.1,  # 10% for profiling
+                integrations=[
+                    FastApiIntegration(transaction_style="endpoint"),
+                    SqlalchemyIntegration(),
+                    LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+                ],
+                # Filter out noisy events
+                before_send=lambda event, hint: _filter_sentry_event(event, hint),
+                # Set release (optional, for tracking deployments)
+                release=None,  # Can be set from git commit hash
+            )
+            logger.info("✅ Sentry error tracking initialized")
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to initialize Sentry: {e}. Error tracking disabled.")
+    else:
+        logger.info("Sentry DSN not configured - error tracking disabled")
+    
     # Startup
     logger.info("Starting FCS RAG Bot API...")
     
@@ -121,6 +151,63 @@ if settings.environment == "development" or settings.debug:
     allowed_origins.append("http://127.0.0.1:3002")
 
 logger.info(f"CORS allowed origins: {allowed_origins}")
+
+
+def _filter_sentry_event(event, hint):
+    """
+    Filter out noisy events from Sentry.
+    
+    Filters:
+    - Health check endpoints (not real errors)
+    - 404 errors (expected, not errors)
+    - Rate limit 429s (expected behavior)
+    """
+    # Get exception info if available
+    exc_info = hint.get('exc_info')
+    if exc_info:
+        exc_type, exc_value, exc_traceback = exc_info
+        
+        # Filter out 404 Not Found errors
+        from fastapi import HTTPException
+        if isinstance(exc_value, HTTPException) and exc_value.status_code == 404:
+            return None  # Don't send to Sentry
+    
+    # Filter by URL path
+    if 'request' in event:
+        url = event['request'].get('url', '')
+        
+        # Filter health check endpoints (but allow sentry-test)
+        if any(path in url for path in ['/health/warmup', '/api/health/warmup', '/health/ready', '/api/health/ready']):
+            return None  # Don't send health check errors
+        # Allow /health/sentry-test to pass through for testing
+        
+        # Filter rate limit errors (429) - these are expected
+        if 'status_code' in event.get('request', {}):
+            if event['request'].get('status_code') == 429:
+                return None  # Don't send rate limit errors
+    
+    # Sanitize sensitive data
+    if 'request' in event:
+        # Remove Authorization header
+        if 'headers' in event['request']:
+            event['request']['headers'].pop('Authorization', None)
+            event['request']['headers'].pop('authorization', None)
+        
+        # Truncate query text if present (privacy)
+        if 'data' in event['request']:
+            data = event['request']['data']
+            if isinstance(data, dict):
+                # Truncate question/query text to 200 chars
+                for key in ['question', 'query', 'calc_script']:
+                    if key in data and isinstance(data[key], str) and len(data[key]) > 200:
+                        data[key] = data[key][:200] + "... [truncated]"
+    
+    return event  # Send the event
+
+
+# Add Sentry user context middleware (before auth middleware)
+from .middleware.sentry_middleware import SentryUserContextMiddleware
+app.add_middleware(SentryUserContextMiddleware)
 
 # Add auth middleware to extract user_id from JWT (for rate limiting)
 from .middleware.auth_middleware import AuthMiddleware
