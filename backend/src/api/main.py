@@ -206,13 +206,32 @@ def _filter_sentry_event(event, hint):
 
 
 # Import middleware after app creation to avoid circular import issues
-try:
-    from .middleware.sentry_middleware import SentryUserContextMiddleware
-    from .middleware.auth_middleware import AuthMiddleware
-except ImportError:
-    # Fallback to absolute import if relative import fails
-    from src.api.middleware.sentry_middleware import SentryUserContextMiddleware
-    from src.api.middleware.auth_middleware import AuthMiddleware
+import importlib.util
+import sys
+from pathlib import Path
+
+# Get the current file's directory
+current_dir = Path(__file__).parent
+middleware_dir = current_dir / "middleware"
+
+# Dynamically import middleware modules
+sentry_spec = importlib.util.spec_from_file_location(
+    "sentry_middleware",
+    middleware_dir / "sentry_middleware.py"
+)
+sentry_module = importlib.util.module_from_spec(sentry_spec)
+sys.modules["sentry_middleware"] = sentry_module
+sentry_spec.loader.exec_module(sentry_module)
+SentryUserContextMiddleware = sentry_module.SentryUserContextMiddleware
+
+auth_spec = importlib.util.spec_from_file_location(
+    "auth_middleware",
+    middleware_dir / "auth_middleware.py"
+)
+auth_module = importlib.util.module_from_spec(auth_spec)
+sys.modules["auth_middleware"] = auth_module
+auth_spec.loader.exec_module(auth_module)
+AuthMiddleware = auth_module.AuthMiddleware
 
 # Add Sentry user context middleware (before auth middleware)
 app.add_middleware(SentryUserContextMiddleware)
