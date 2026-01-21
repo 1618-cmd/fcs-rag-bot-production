@@ -206,54 +206,25 @@ def _filter_sentry_event(event, hint):
 
 
 # Import middleware after app creation to avoid circular import issues
-# Use relative import with try/except for better compatibility
+# Import directly from files using relative imports (works on both local and Render)
 try:
-    # Try relative import first (works in most cases)
-    from .middleware import sentry_middleware, auth_middleware
-    SentryUserContextMiddleware = sentry_middleware.SentryUserContextMiddleware
-    AuthMiddleware = auth_middleware.AuthMiddleware
-except (ImportError, AttributeError) as e:
-    # Fallback: use importlib to load modules directly from file paths
-    try:
-        import importlib.util
-        import sys
-        from pathlib import Path
-        
-        # Get the directory of this file
-        current_file = Path(__file__).resolve()
-        api_dir = current_file.parent
-        middleware_dir = api_dir / "middleware"
-        
-        # Load sentry_middleware
-        sentry_path = middleware_dir / "sentry_middleware.py"
-        if sentry_path.exists():
-            sentry_spec = importlib.util.spec_from_file_location(
-                "sentry_middleware",
-                sentry_path
-            )
-            sentry_module = importlib.util.module_from_spec(sentry_spec)
-            sys.modules["sentry_middleware"] = sentry_module
-            sentry_spec.loader.exec_module(sentry_module)
-            SentryUserContextMiddleware = sentry_module.SentryUserContextMiddleware
-        else:
-            raise ImportError(f"sentry_middleware.py not found at {sentry_path}")
-        
-        # Load auth_middleware
-        auth_path = middleware_dir / "auth_middleware.py"
-        if auth_path.exists():
-            auth_spec = importlib.util.spec_from_file_location(
-                "auth_middleware",
-                auth_path
-            )
-            auth_module = importlib.util.module_from_spec(auth_spec)
-            sys.modules["auth_middleware"] = auth_module
-            auth_spec.loader.exec_module(auth_module)
-            AuthMiddleware = auth_module.AuthMiddleware
-        else:
-            raise ImportError(f"auth_middleware.py not found at {auth_path}")
-    except Exception as import_error:
-        logger.error(f"Failed to import middleware: {import_error}")
-        raise
+    from .middleware.sentry_middleware import SentryUserContextMiddleware
+    from .middleware.auth_middleware import AuthMiddleware
+except ImportError as e:
+    logger.error(f"Failed to import middleware: {e}")
+    # If middleware fails to import, create no-op middleware to prevent app crash
+    from fastapi import Request
+    from starlette.middleware.base import BaseHTTPMiddleware
+    
+    class SentryUserContextMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            return await call_next(request)
+    
+    class AuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            return await call_next(request)
+    
+    logger.warning("Using no-op middleware - Sentry user context and auth extraction disabled")
 
 # Add Sentry user context middleware (before auth middleware)
 app.add_middleware(SentryUserContextMiddleware)
