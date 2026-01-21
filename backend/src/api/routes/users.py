@@ -6,7 +6,7 @@ import logging
 import uuid
 import bcrypt
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
@@ -117,6 +117,7 @@ class UserResponse(BaseModel):
 @router.post("/users", response_model=UserResponse)
 @limit_user_management()
 async def create_user(
+    http_request: Request,
     request: CreateUserRequest,
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)
@@ -178,6 +179,7 @@ async def create_user(
 @router.get("/users", response_model=List[UserResponse])
 @limit_user_management()
 async def list_users(
+    http_request: Request,
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)
 ):
@@ -214,6 +216,7 @@ async def list_users(
 @router.put("/users/{user_id}/role")
 @limit_user_management()
 async def assign_role(
+    http_request: Request,
     user_id: str,
     request: AssignRoleRequest,
     db: Session = Depends(get_db),
@@ -257,6 +260,7 @@ async def assign_role(
 @router.put("/users/{user_id}", response_model=UserResponse)
 @limit_user_management()
 async def update_user(
+    http_request: Request,
     user_id: str,
     request: UpdateUserRequest,
     db: Session = Depends(get_db),
@@ -311,6 +315,7 @@ async def update_user(
 @router.delete("/users/{user_id}")
 @limit_user_management()
 async def delete_user(
+    http_request: Request,
     user_id: str,
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)

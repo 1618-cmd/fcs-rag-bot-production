@@ -94,7 +94,7 @@ class QueryResponse(BaseModel):
 
 @router.post("/query", response_model=QueryResponse)
 @limit_query()
-async def query_rag(request: QueryRequest):
+async def query_rag(http_request: Request, request: QueryRequest):
     """
     Query the RAG system (JSON request).
     

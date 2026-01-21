@@ -58,7 +58,7 @@ class KillSwitchRequest(BaseModel):
 
 @router.get("/documents/pending", response_model=List[DocumentInfo])
 @limit_admin()
-async def get_pending(user_info: Optional[dict] = Depends(get_current_user_info)):
+async def get_pending(http_request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Get list of all pending documents in staging folder.
     
@@ -121,7 +121,7 @@ async def get_approved():
 
 @router.get("/documents/archived", response_model=List[DocumentInfo])
 @limit_admin()
-async def get_archived(user_info: Optional[dict] = Depends(get_current_user_info)):
+async def get_archived(http_request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Get list of all archived/rejected documents.
     
@@ -155,7 +155,7 @@ async def get_archived(user_info: Optional[dict] = Depends(get_current_user_info
 
 @router.post("/documents/approve")
 @limit_admin()
-async def approve(request: ApproveRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
+async def approve(http_request: Request, request: ApproveRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Approve a document by moving it from staging to approved folder.
     
@@ -188,7 +188,7 @@ async def approve(request: ApproveRequest, user_info: Optional[dict] = Depends(g
 
 @router.post("/documents/reject")
 @limit_admin()
-async def reject(request: RejectRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
+async def reject(http_request: Request, request: RejectRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Reject a document by moving it from staging to archive folder.
     
@@ -268,7 +268,7 @@ async def upload_document(
 
 @router.get("/kill-switch/status")
 @limit_admin()
-async def get_kill_switch_status_endpoint(user_info: Optional[dict] = Depends(get_current_user_info)):
+async def get_kill_switch_status_endpoint(http_request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Get current kill switch status.
     Requires admin authentication.
@@ -286,6 +286,7 @@ async def get_kill_switch_status_endpoint(user_info: Optional[dict] = Depends(ge
 @router.post("/kill-switch/toggle")
 @limit_admin()
 async def toggle_kill_switch(
+    http_request: Request,
     request: KillSwitchRequest,
     user_info: Optional[dict] = Depends(get_current_user_info)
 ):

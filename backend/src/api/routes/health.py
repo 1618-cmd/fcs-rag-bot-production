@@ -2,7 +2,7 @@
 Health check endpoints.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ...utils.config import settings
@@ -136,3 +136,23 @@ async def clear_cache_endpoint():
             "status": "error",
             "message": f"Failed to clear cache: {str(e)}"
         }
+
+
+@router.get("/health/sentry-test")
+async def sentry_test():
+    """
+    Test endpoint to verify Sentry is working.
+    
+    Intentionally triggers an error that should appear in Sentry.
+    Only use for testing - remove or protect in production.
+    """
+    try:
+        # Intentionally trigger an error
+        division_by_zero = 1 / 0
+        return {"status": "error", "message": "This should not be reached"}
+    except ZeroDivisionError as e:
+        # This error will be captured by Sentry
+        raise HTTPException(
+            status_code=500,
+            detail="Test error triggered - check Sentry dashboard"
+        )

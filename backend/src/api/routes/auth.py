@@ -110,7 +110,7 @@ async def get_current_user_info(
 
 @router.post("/login", response_model=LoginResponse)
 @limit_login()
-async def login(request: LoginRequest):
+async def login(http_request: Request, request: LoginRequest):
     """
     Login endpoint for users.
     
