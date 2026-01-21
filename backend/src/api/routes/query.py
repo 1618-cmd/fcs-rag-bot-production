@@ -13,6 +13,7 @@ from ...utils.config import settings
 from ...services.cache import get_cached_response, cache_response
 from ...services.kill_switch import is_kill_switch_enabled, get_kill_switch_message
 from ...services.rate_limiter import limit_query
+from ...services.query_logger import log_query_async
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -104,6 +105,7 @@ async def query_rag(request: Request, body: QueryRequest):
     For file uploads, use /api/query/upload endpoint.
     """
     return await _process_query(
+        request=request,
         question=body.question,
         calc_script=body.calc_script,
         top_k=body.top_k,
@@ -137,6 +139,7 @@ async def query_rag_with_file(
         calc_script_text = extract_text_from_file(calc_script_file)
     
     return await _process_query(
+        request=request,
         question=question,
         calc_script=calc_script_text,
         top_k=top_k,
@@ -145,6 +148,7 @@ async def query_rag_with_file(
 
 
 async def _process_query(
+    request: Request,
     question: str,
     calc_script: Optional[str] = None,
     top_k: Optional[int] = None,
@@ -190,12 +194,34 @@ Question: {question}"""
             cache_key = f"{calc_script.strip()}\n\n{question}"
         
         # Check cache first (unless skip_cache is True)
+        was_cached = False
         if not skip_cache:
             cached_response = get_cached_response(cache_key)
             if cached_response:
                 # Return cached response (much faster!)
+                was_cached = True
+                latency_ms = (time.time() - start_time) * 1000
                 logger.info(f"Returning cached response (saved {cached_response.get('latency_ms', 0)}ms)")
-                return QueryResponse(**cached_response)
+                cached_query_response = QueryResponse(**cached_response)
+                
+                # Log cached query (non-blocking)
+                try:
+                    source_names = [s.name for s in cached_query_response.sources]
+                    log_query_async(
+                        request=request,
+                        question=question,
+                        answer=cached_query_response.answer,
+                        sources=source_names,
+                        latency_ms=latency_ms,
+                        was_cached=True,
+                        was_refusal=False,
+                        refusal_reason=None,
+                        calc_script=calc_script
+                    )
+                except Exception as log_error:
+                    logger.debug(f"Query logging failed (non-critical): {log_error}")
+                
+                return cached_query_response
         else:
             logger.info("Skipping cache (skip_cache=True)")
         
@@ -284,6 +310,30 @@ Question: {question}"""
         
         # Cache the response for future queries
         cache_response(cache_key, query_response.dict())
+        
+        # Log query to database (non-blocking, fire-and-forget)
+        # Never blocks or breaks queries if logging fails
+        try:
+            source_names = [s.name for s in sources]
+            was_cached = False  # We already checked cache earlier, this is a fresh response
+            refusal_reason = None
+            if is_refusal:
+                refusal_reason = "Insufficient information in context documents"
+            
+            log_query_async(
+                request=request,
+                question=question,
+                answer=response,
+                sources=source_names,
+                latency_ms=latency_ms,
+                was_cached=was_cached,
+                was_refusal=is_refusal,
+                refusal_reason=refusal_reason,
+                calc_script=calc_script
+            )
+        except Exception as log_error:
+            # Never raise - logging failures should never break queries
+            logger.debug(f"Query logging failed (non-critical): {log_error}")
         
         return query_response
         
