@@ -206,32 +206,36 @@ def _filter_sentry_event(event, hint):
 
 
 # Import middleware after app creation to avoid circular import issues
-import importlib.util
-import sys
-from pathlib import Path
-
-# Get the current file's directory
-current_dir = Path(__file__).parent
-middleware_dir = current_dir / "middleware"
-
-# Dynamically import middleware modules
-sentry_spec = importlib.util.spec_from_file_location(
-    "sentry_middleware",
-    middleware_dir / "sentry_middleware.py"
-)
-sentry_module = importlib.util.module_from_spec(sentry_spec)
-sys.modules["sentry_middleware"] = sentry_module
-sentry_spec.loader.exec_module(sentry_module)
-SentryUserContextMiddleware = sentry_module.SentryUserContextMiddleware
-
-auth_spec = importlib.util.spec_from_file_location(
-    "auth_middleware",
-    middleware_dir / "auth_middleware.py"
-)
-auth_module = importlib.util.module_from_spec(auth_spec)
-sys.modules["auth_middleware"] = auth_module
-auth_spec.loader.exec_module(auth_module)
-AuthMiddleware = auth_module.AuthMiddleware
+# Use relative import with try/except for better compatibility
+try:
+    # Try relative import first (works in most cases)
+    from .middleware import sentry_middleware, auth_middleware
+    SentryUserContextMiddleware = sentry_middleware.SentryUserContextMiddleware
+    AuthMiddleware = auth_middleware.AuthMiddleware
+except (ImportError, AttributeError):
+    # Fallback: try importing the modules directly
+    try:
+        import sys
+        import os
+        from pathlib import Path
+        
+        # Get the directory of this file
+        current_file = Path(__file__).resolve()
+        api_dir = current_file.parent
+        middleware_dir = api_dir / "middleware"
+        
+        # Add middleware directory to path if not already there
+        if str(middleware_dir) not in sys.path:
+            sys.path.insert(0, str(middleware_dir))
+        
+        # Import directly from middleware directory
+        import sentry_middleware
+        import auth_middleware
+        SentryUserContextMiddleware = sentry_middleware.SentryUserContextMiddleware
+        AuthMiddleware = auth_middleware.AuthMiddleware
+    except Exception as e:
+        logger.error(f"Failed to import middleware: {e}")
+        raise
 
 # Add Sentry user context middleware (before auth middleware)
 app.add_middleware(SentryUserContextMiddleware)
