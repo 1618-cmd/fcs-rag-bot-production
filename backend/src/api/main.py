@@ -212,11 +212,11 @@ try:
     from .middleware import sentry_middleware, auth_middleware
     SentryUserContextMiddleware = sentry_middleware.SentryUserContextMiddleware
     AuthMiddleware = auth_middleware.AuthMiddleware
-except (ImportError, AttributeError):
-    # Fallback: try importing the modules directly
+except (ImportError, AttributeError) as e:
+    # Fallback: use importlib to load modules directly from file paths
     try:
+        import importlib.util
         import sys
-        import os
         from pathlib import Path
         
         # Get the directory of this file
@@ -224,17 +224,35 @@ except (ImportError, AttributeError):
         api_dir = current_file.parent
         middleware_dir = api_dir / "middleware"
         
-        # Add middleware directory to path if not already there
-        if str(middleware_dir) not in sys.path:
-            sys.path.insert(0, str(middleware_dir))
+        # Load sentry_middleware
+        sentry_path = middleware_dir / "sentry_middleware.py"
+        if sentry_path.exists():
+            sentry_spec = importlib.util.spec_from_file_location(
+                "sentry_middleware",
+                sentry_path
+            )
+            sentry_module = importlib.util.module_from_spec(sentry_spec)
+            sys.modules["sentry_middleware"] = sentry_module
+            sentry_spec.loader.exec_module(sentry_module)
+            SentryUserContextMiddleware = sentry_module.SentryUserContextMiddleware
+        else:
+            raise ImportError(f"sentry_middleware.py not found at {sentry_path}")
         
-        # Import directly from middleware directory
-        import sentry_middleware
-        import auth_middleware
-        SentryUserContextMiddleware = sentry_middleware.SentryUserContextMiddleware
-        AuthMiddleware = auth_middleware.AuthMiddleware
-    except Exception as e:
-        logger.error(f"Failed to import middleware: {e}")
+        # Load auth_middleware
+        auth_path = middleware_dir / "auth_middleware.py"
+        if auth_path.exists():
+            auth_spec = importlib.util.spec_from_file_location(
+                "auth_middleware",
+                auth_path
+            )
+            auth_module = importlib.util.module_from_spec(auth_spec)
+            sys.modules["auth_middleware"] = auth_module
+            auth_spec.loader.exec_module(auth_module)
+            AuthMiddleware = auth_module.AuthMiddleware
+        else:
+            raise ImportError(f"auth_middleware.py not found at {auth_path}")
+    except Exception as import_error:
+        logger.error(f"Failed to import middleware: {import_error}")
         raise
 
 # Add Sentry user context middleware (before auth middleware)
