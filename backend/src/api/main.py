@@ -206,8 +206,13 @@ def _filter_sentry_event(event, hint):
 
 
 # Import middleware after app creation to avoid circular import issues
-from .middleware.sentry_middleware import SentryUserContextMiddleware
-from .middleware.auth_middleware import AuthMiddleware
+try:
+    from .middleware.sentry_middleware import SentryUserContextMiddleware
+    from .middleware.auth_middleware import AuthMiddleware
+except ImportError:
+    # Fallback to absolute import if relative import fails
+    from src.api.middleware.sentry_middleware import SentryUserContextMiddleware
+    from src.api.middleware.auth_middleware import AuthMiddleware
 
 # Add Sentry user context middleware (before auth middleware)
 app.add_middleware(SentryUserContextMiddleware)
