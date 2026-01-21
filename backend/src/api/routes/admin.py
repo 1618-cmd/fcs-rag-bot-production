@@ -4,7 +4,7 @@ Admin endpoints for document approval workflow.
 
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from pydantic import BaseModel
 
 from ...services.s3_documents import (
@@ -223,6 +223,7 @@ async def reject(request: RejectRequest, user_info: Optional[dict] = Depends(get
 @router.post("/documents/upload")
 @limit_admin()
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     user_info: Optional[dict] = Depends(get_current_user_info)
 ):

@@ -5,7 +5,7 @@ Query endpoints for RAG queries.
 import time
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from pydantic import BaseModel, Field
 
 from ...core.rag import get_rag_pipeline
@@ -114,6 +114,7 @@ async def query_rag(request: QueryRequest):
 @router.post("/query/upload", response_model=QueryResponse)
 @limit_query()
 async def query_rag_with_file(
+    request: Request,
     question: str = Form(...),
     calc_script: Optional[str] = Form(None),
     calc_script_file: Optional[UploadFile] = File(None),
