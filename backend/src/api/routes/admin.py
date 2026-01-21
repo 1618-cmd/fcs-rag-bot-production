@@ -15,6 +15,11 @@ from ...services.s3_documents import (
     reject_document,
     upload_document_to_staging
 )
+from ...services.kill_switch import (
+    is_kill_switch_enabled,
+    set_kill_switch,
+    get_kill_switch_status
+)
 from ...utils.config import settings
 from .auth import get_current_user_info
 from qdrant_client import QdrantClient
@@ -42,6 +47,12 @@ class RejectRequest(BaseModel):
     """Request model for rejecting a document."""
     document_key: str
     reason: Optional[str] = None
+
+
+class KillSwitchRequest(BaseModel):
+    """Request model for kill switch toggle."""
+    enabled: bool  # True to disable system, False to enable
+    message: Optional[str] = None  # Optional custom message
 
 
 @router.get("/documents/pending", response_model=List[DocumentInfo])
@@ -246,3 +257,68 @@ async def upload_document(
     except Exception as e:
         logger.error(f"Error uploading document: {e}")
         raise HTTPException(status_code=500, detail=f"Error uploading document: {str(e)}")
+
+
+@router.get("/kill-switch/status")
+async def get_kill_switch_status_endpoint(user_info: Optional[dict] = Depends(get_current_user_info)):
+    """
+    Get current kill switch status.
+    Requires admin authentication.
+    """
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    # Check if user is admin
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    return get_kill_switch_status()
+
+
+@router.post("/kill-switch/toggle")
+async def toggle_kill_switch(
+    request: KillSwitchRequest,
+    user_info: Optional[dict] = Depends(get_current_user_info)
+):
+    """
+    Toggle kill switch (enable/disable system).
+    Requires admin authentication.
+    
+    Args:
+        request: Kill switch request with enabled flag and optional message
+        user_info: Current user info from auth
+        
+    Returns:
+        Updated kill switch status
+    """
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    # Check if user is admin
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user_id = user_info.get("user_id") or user_info.get("email", "unknown")
+    
+    # Set kill switch
+    success = set_kill_switch(
+        enabled=request.enabled,
+        message=request.message,
+        user_id=user_id
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update kill switch. Check logs for details."
+        )
+    
+    status = get_kill_switch_status()
+    action = "disabled" if request.enabled else "enabled"
+    logger.info(f"Kill switch {action} by {user_id}. Message: {request.message}")
+    
+    return {
+        "success": True,
+        "message": f"System {action} successfully",
+        "status": status
+    }

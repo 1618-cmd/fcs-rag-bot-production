@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     redis_url: Optional[str] = None
     cache_ttl: int = 86400  # 24 hours in seconds
     
+    # Rate Limiting Configuration
+    rate_limit_enabled: bool = True
+    rate_limit_query_per_minute: int = 20  # Queries per minute per user/IP
+    rate_limit_user_management_per_minute: int = 10  # User management endpoints
+    rate_limit_login_per_minute: int = 5  # Login attempts per minute per IP
+    
+    # Sentry Configuration (Error Tracking)
+    sentry_dsn: Optional[str] = None
+    sentry_environment: str = "production"  # Will be set from environment
+    sentry_traces_sample_rate: float = 1.0  # 100% in production, lower in dev
+    
     # Paths (relative to project root)
     project_root: Path = Path(__file__).parent.parent.parent.parent
     knowledge_base_dir: Path = project_root / "knowledge_base"
@@ -73,10 +84,10 @@ class Settings(BaseSettings):
     jira_labels: Optional[str] = None  # Comma-separated labels (e.g., "rag-bot,support")
     
     # Authentication Configuration (simple auth, no database)
-    jwt_secret_key: str = "your-secret-key-change-in-production"  # JWT secret key
-    admin_email: str = "admin@example.com"  # Admin email for login
-    admin_password: str = "admin"  # Admin password (change in production!)
-    jira_labels: str = "rag-bot,support"  # Comma-separated labels for created tickets
+    jwt_secret_key: str = "your-secret-key-change-in-production"  # MUST be overridden in production
+    admin_email: str = "admin@example.com"  # Used only for optional fallback login
+    admin_password: str = "admin"  # Used only for optional fallback login
+    allow_fallback_admin_login: bool = False  # Recommended: keep False in production
     
     # Logging
     log_level: str = "INFO"
@@ -116,6 +127,13 @@ def validate_settings() -> bool:
     # Check database URL for production
     if settings.environment == "production" and not settings.database_url:
         errors.append("DATABASE_URL not configured (required for production)")
+    
+    # JWT secret MUST be set in production (avoid default)
+    if settings.environment == "production":
+        if (not settings.jwt_secret_key) or (settings.jwt_secret_key == "your-secret-key-change-in-production"):
+            errors.append("JWT_SECRET_KEY not configured (required for production)")
+        elif len(settings.jwt_secret_key) < 32:
+            errors.append("JWT_SECRET_KEY is too short (recommended: 32+ characters)")
     
     if errors:
         print("Configuration validation failed:")

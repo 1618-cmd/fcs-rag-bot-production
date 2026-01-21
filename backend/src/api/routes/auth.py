@@ -27,6 +27,7 @@ JWT_EXPIRATION_HOURS = 24
 # Fallback admin credentials from environment (for initial setup)
 ADMIN_EMAIL = getattr(settings, 'admin_email', 'admin@example.com')
 ADMIN_PASSWORD = getattr(settings, 'admin_password', 'admin')
+ALLOW_FALLBACK_ADMIN_LOGIN = getattr(settings, 'allow_fallback_admin_login', False)
 
 
 class LoginRequest(BaseModel):
@@ -143,7 +144,8 @@ async def login(request: LoginRequest):
         pass
     
     # Fallback to environment variables (for initial setup before database is populated)
-    if request.email == ADMIN_EMAIL and request.password == ADMIN_PASSWORD:
+    # Best practice: keep this disabled in production unless explicitly enabled.
+    if ALLOW_FALLBACK_ADMIN_LOGIN and request.email == ADMIN_EMAIL and request.password == ADMIN_PASSWORD:
         # Create a temporary token (user_id will be email for fallback)
         token = create_jwt_token(ADMIN_EMAIL, ADMIN_EMAIL, "default", "admin")
         logger.info(f"Fallback login (env vars): {request.email}")

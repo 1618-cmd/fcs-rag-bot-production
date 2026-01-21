@@ -35,6 +35,7 @@ python-docx>=1.1.0  # For Word document parsing
 
 # Utilities
 httpx>=0.27.0  # Latest with Python 3.13 support
+aiohttp>=3.9.0  # For async load testing
 
 # AWS S3 Support (for knowledge base hosting)
 boto3>=1.34.0

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from ...services.jira import create_ticket, is_jira_configured
+from ...services.kill_switch import is_kill_switch_enabled, get_kill_switch_message
 from ...utils.config import settings
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,19 @@ async def create_jira_ticket(request: CreateTicketRequest):
     This endpoint allows users to create support tickets when the bot
     cannot answer their question or when they need additional help.
     """
+    # Check kill switch first
+    if is_kill_switch_enabled():
+        message = get_kill_switch_message() or "System is currently disabled for maintenance. Please try again later."
+        logger.warning(f"Jira ticket creation blocked by kill switch: {request.question[:50]}...")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "Service Unavailable",
+                "message": message,
+                "kill_switch_enabled": True
+            }
+        )
+    
     # Check if Jira is configured
     if not is_jira_configured():
         raise HTTPException(

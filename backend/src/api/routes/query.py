@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from ...core.rag import get_rag_pipeline
 from ...utils.config import settings
 from ...services.cache import get_cached_response, cache_response
+from ...services.kill_switch import is_kill_switch_enabled, get_kill_switch_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -150,6 +151,19 @@ async def _process_query(
     
     Handles both regular queries and calc script analysis.
     """
+    # Check kill switch first
+    if is_kill_switch_enabled():
+        message = get_kill_switch_message() or "System is currently disabled for maintenance. Please try again later."
+        logger.warning(f"Query blocked by kill switch: {question[:50]}...")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "Service Unavailable",
+                "message": message,
+                "kill_switch_enabled": True
+            }
+        )
+    
     start_time = time.time()
     
     try:

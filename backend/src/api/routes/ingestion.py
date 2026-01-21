@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Header
 from typing import Optional
 
 from ...core.ingestion import ingest_knowledge_base
+from ...services.kill_switch import is_kill_switch_enabled, get_kill_switch_message
 from ...utils.config import settings
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,19 @@ async def trigger_ingestion(
     
     Requires API key authentication (set INGESTION_API_KEY in environment).
     """
+    # Check kill switch first
+    if is_kill_switch_enabled():
+        message = get_kill_switch_message() or "System is currently disabled for maintenance. Please try again later."
+        logger.warning("Ingestion blocked by kill switch")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "Service Unavailable",
+                "message": message,
+                "kill_switch_enabled": True
+            }
+        )
+    
     # Check API key if configured
     ingestion_api_key = getattr(settings, 'ingestion_api_key', None)
     if ingestion_api_key:
