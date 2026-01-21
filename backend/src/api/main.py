@@ -18,8 +18,6 @@ from ..utils.config import settings, validate_settings
 from ..utils.logging_config import setup_logging
 from ..services.rate_limiter import get_limiter, rate_limit_handler
 from .routes import query, health, ingestion, jira, admin, auth, users
-from .middleware.sentry_middleware import SentryUserContextMiddleware
-from .middleware.auth_middleware import AuthMiddleware
 
 # Set up logging
 setup_logging(log_level=settings.log_level)
