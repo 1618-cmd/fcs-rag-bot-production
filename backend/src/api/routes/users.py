@@ -179,7 +179,7 @@ async def create_user(
 @router.get("/users", response_model=List[UserResponse])
 @limit_user_management()
 async def list_users(
-    http_request: Request,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)
 ):
@@ -216,9 +216,9 @@ async def list_users(
 @router.put("/users/{user_id}/role")
 @limit_user_management()
 async def assign_role(
-    http_request: Request,
+    request: Request,
     user_id: str,
-    request: AssignRoleRequest,
+    body: AssignRoleRequest,
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)
 ):
@@ -315,7 +315,7 @@ async def update_user(
 @router.delete("/users/{user_id}")
 @limit_user_management()
 async def delete_user(
-    http_request: Request,
+    request: Request,
     user_id: str,
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)
