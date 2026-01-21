@@ -18,6 +18,8 @@ from ..utils.config import settings, validate_settings
 from ..utils.logging_config import setup_logging
 from ..services.rate_limiter import get_limiter, rate_limit_handler
 from .routes import query, health, ingestion, jira, admin, auth, users
+from .middleware.sentry_middleware import SentryUserContextMiddleware
+from .middleware.auth_middleware import AuthMiddleware
 
 # Set up logging
 setup_logging(log_level=settings.log_level)
@@ -206,11 +208,9 @@ def _filter_sentry_event(event, hint):
 
 
 # Add Sentry user context middleware (before auth middleware)
-from .middleware.sentry_middleware import SentryUserContextMiddleware
 app.add_middleware(SentryUserContextMiddleware)
 
 # Add auth middleware to extract user_id from JWT (for rate limiting)
-from .middleware.auth_middleware import AuthMiddleware
 app.add_middleware(AuthMiddleware)
 
 # Add rate limiting middleware (if enabled)
