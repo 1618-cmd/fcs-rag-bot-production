@@ -94,7 +94,7 @@ class QueryResponse(BaseModel):
 
 @router.post("/query", response_model=QueryResponse)
 @limit_query()
-async def query_rag(http_request: Request, request: QueryRequest):
+async def query_rag(request: Request, body: QueryRequest):
     """
     Query the RAG system (JSON request).
     
@@ -104,10 +104,10 @@ async def query_rag(http_request: Request, request: QueryRequest):
     For file uploads, use /api/query/upload endpoint.
     """
     return await _process_query(
-        question=request.question,
-        calc_script=request.calc_script,
-        top_k=request.top_k,
-        skip_cache=request.skip_cache
+        question=body.question,
+        calc_script=body.calc_script,
+        top_k=body.top_k,
+        skip_cache=body.skip_cache
     )
 
 

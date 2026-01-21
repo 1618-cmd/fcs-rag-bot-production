@@ -117,8 +117,8 @@ class UserResponse(BaseModel):
 @router.post("/users", response_model=UserResponse)
 @limit_user_management()
 async def create_user(
-    http_request: Request,
-    request: CreateUserRequest,
+    request: Request,
+    body: CreateUserRequest,
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)
 ):
@@ -163,7 +163,7 @@ async def create_user(
     db.commit()
     db.refresh(new_user)
     
-    logger.info(f"User created: {request.email} with role {request.role} by {current_user}")
+    logger.info(f"User created: {body.email} with role {body.role} by {current_user}")
     
     return UserResponse(
         id=new_user.id,
@@ -252,17 +252,17 @@ async def assign_role(
     user.role = request.role
     db.commit()
     
-    logger.info(f"Role '{request.role}' assigned to user {user.email} by {current_user}")
+    logger.info(f"Role '{body.role}' assigned to user {user.email} by {current_user}")
     
-    return {"success": True, "message": f"Role '{request.role}' assigned to user"}
+    return {"success": True, "message": f"Role '{body.role}' assigned to user"}
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
 @limit_user_management()
 async def update_user(
-    http_request: Request,
+    request: Request,
     user_id: str,
-    request: UpdateUserRequest,
+    body: UpdateUserRequest,
     db: Session = Depends(get_db),
     current_user: Optional[str] = Depends(get_current_user)
 ):
@@ -293,10 +293,10 @@ async def update_user(
         user.full_name = request.full_name
     if request.is_active is not None:
         user.is_active = request.is_active
-    if request.role is not None:
-        if request.role not in ROLES:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {request.role}")
-        user.role = request.role
+    if body.role is not None:
+        if body.role not in ROLES:
+            raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}")
+        user.role = body.role
     
     db.commit()
     db.refresh(user)

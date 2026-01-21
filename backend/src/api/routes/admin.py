@@ -58,7 +58,7 @@ class KillSwitchRequest(BaseModel):
 
 @router.get("/documents/pending", response_model=List[DocumentInfo])
 @limit_admin()
-async def get_pending(http_request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
+async def get_pending(request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Get list of all pending documents in staging folder.
     
@@ -121,7 +121,7 @@ async def get_approved():
 
 @router.get("/documents/archived", response_model=List[DocumentInfo])
 @limit_admin()
-async def get_archived(http_request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
+async def get_archived(request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Get list of all archived/rejected documents.
     
@@ -155,7 +155,7 @@ async def get_archived(http_request: Request, user_info: Optional[dict] = Depend
 
 @router.post("/documents/approve")
 @limit_admin()
-async def approve(http_request: Request, request: ApproveRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
+async def approve(request: Request, body: ApproveRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Approve a document by moving it from staging to approved folder.
     
@@ -170,14 +170,14 @@ async def approve(http_request: Request, request: ApproveRequest, user_info: Opt
         if not settings.use_s3 or not settings.s3_bucket_name:
             raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
         
-        success = approve_document(request.document_key)
+        success = approve_document(body.document_key)
         if not success:
-            raise HTTPException(status_code=400, detail=f"Failed to approve document: {request.document_key}")
+            raise HTTPException(status_code=400, detail=f"Failed to approve document: {body.document_key}")
         
         return {
             "success": True,
-            "message": f"Document approved: {request.document_key}",
-            "document_key": request.document_key
+            "message": f"Document approved: {body.document_key}",
+            "document_key": body.document_key
         }
     except HTTPException:
         raise
@@ -188,7 +188,7 @@ async def approve(http_request: Request, request: ApproveRequest, user_info: Opt
 
 @router.post("/documents/reject")
 @limit_admin()
-async def reject(http_request: Request, request: RejectRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
+async def reject(request: Request, body: RejectRequest, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Reject a document by moving it from staging to archive folder.
     
@@ -203,15 +203,15 @@ async def reject(http_request: Request, request: RejectRequest, user_info: Optio
         if not settings.use_s3 or not settings.s3_bucket_name:
             raise HTTPException(status_code=400, detail="S3 is not configured. Set USE_S3=true and S3_BUCKET_NAME.")
         
-        success = reject_document(request.document_key)
+        success = reject_document(body.document_key)
         if not success:
-            raise HTTPException(status_code=400, detail=f"Failed to reject document: {request.document_key}")
+            raise HTTPException(status_code=400, detail=f"Failed to reject document: {body.document_key}")
         
         return {
             "success": True,
-            "message": f"Document rejected: {request.document_key}",
-            "document_key": request.document_key,
-            "reason": request.reason
+            "message": f"Document rejected: {body.document_key}",
+            "document_key": body.document_key,
+            "reason": body.reason
         }
     except HTTPException:
         raise
@@ -268,7 +268,7 @@ async def upload_document(
 
 @router.get("/kill-switch/status")
 @limit_admin()
-async def get_kill_switch_status_endpoint(http_request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
+async def get_kill_switch_status_endpoint(request: Request, user_info: Optional[dict] = Depends(get_current_user_info)):
     """
     Get current kill switch status.
     Requires admin authentication.
@@ -286,8 +286,8 @@ async def get_kill_switch_status_endpoint(http_request: Request, user_info: Opti
 @router.post("/kill-switch/toggle")
 @limit_admin()
 async def toggle_kill_switch(
-    http_request: Request,
-    request: KillSwitchRequest,
+    request: Request,
+    body: KillSwitchRequest,
     user_info: Optional[dict] = Depends(get_current_user_info)
 ):
     """
@@ -312,8 +312,8 @@ async def toggle_kill_switch(
     
     # Set kill switch
     success = set_kill_switch(
-        enabled=request.enabled,
-        message=request.message,
+        enabled=body.enabled,
+        message=body.message,
         user_id=user_id
     )
     
@@ -324,8 +324,8 @@ async def toggle_kill_switch(
         )
     
     status = get_kill_switch_status()
-    action = "disabled" if request.enabled else "enabled"
-    logger.info(f"Kill switch {action} by {user_id}. Message: {request.message}")
+    action = "disabled" if body.enabled else "enabled"
+    logger.info(f"Kill switch {action} by {user_id}. Message: {body.message}")
     
     return {
         "success": True,

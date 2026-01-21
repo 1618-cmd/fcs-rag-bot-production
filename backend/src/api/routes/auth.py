@@ -111,7 +111,7 @@ async def get_current_user_info(
 
 @router.post("/login", response_model=LoginResponse)
 @limit_login()
-async def login(http_request: Request, request: LoginRequest):
+async def login(request: Request, body: LoginRequest):
     """
     Login endpoint for users.
     
@@ -121,7 +121,7 @@ async def login(http_request: Request, request: LoginRequest):
     try:
         from ...services.database import get_db_context
         with get_db_context() as db:
-            user = db.query(User).filter(User.email == request.email).first()
+            user = db.query(User).filter(User.email == body.email).first()
             
             if user:
                 # Database user - verify password
@@ -130,16 +130,16 @@ async def login(http_request: Request, request: LoginRequest):
                 
                 # Check password
                 from .users import verify_password
-                if user.password_hash and verify_password(request.password, user.password_hash):
+                if user.password_hash and verify_password(body.password, user.password_hash):
                     token = create_jwt_token(user.id, user.email, user.tenant_id, user.role)
-                    logger.info(f"User logged in: {request.email} (role: {user.role})")
+                    logger.info(f"User logged in: {body.email} (role: {user.role})")
                     return LoginResponse(
                         success=True,
                         token=token,
                         message="Login successful"
                     )
                 else:
-                    logger.warning(f"Failed login attempt for email: {request.email} (invalid password)")
+                    logger.warning(f"Failed login attempt for email: {body.email} (invalid password)")
                     raise HTTPException(status_code=401, detail="Invalid email or password")
     except Exception as e:
         # Database not available or error - fall through to fallback
@@ -148,17 +148,17 @@ async def login(http_request: Request, request: LoginRequest):
     
     # Fallback to environment variables (for initial setup before database is populated)
     # Best practice: keep this disabled in production unless explicitly enabled.
-    if ALLOW_FALLBACK_ADMIN_LOGIN and request.email == ADMIN_EMAIL and request.password == ADMIN_PASSWORD:
+    if ALLOW_FALLBACK_ADMIN_LOGIN and body.email == ADMIN_EMAIL and body.password == ADMIN_PASSWORD:
         # Create a temporary token (user_id will be email for fallback)
         token = create_jwt_token(ADMIN_EMAIL, ADMIN_EMAIL, "default", "admin")
-        logger.info(f"Fallback login (env vars): {request.email}")
+        logger.info(f"Fallback login (env vars): {body.email}")
         return LoginResponse(
             success=True,
             token=token,
             message="Login successful (using fallback credentials)"
         )
     
-    logger.warning(f"Failed login attempt for email: {request.email}")
+    logger.warning(f"Failed login attempt for email: {body.email}")
     raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
