@@ -13,15 +13,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
+    # LLM Provider Configuration
+    llm_provider: str = "openai"  # Options: 'openai', 'anthropic'
+    
     # OpenAI Configuration
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"
+    
+    # Anthropic Configuration (for Claude)
+    anthropic_api_key: Optional[str] = None
+    anthropic_model: str = "claude-3-5-sonnet-20241022"
+    
+    # Embeddings (can use OpenAI embeddings even with Claude LLM)
     embedding_model: str = "text-embedding-3-small"
+    embedding_provider: str = "openai"  # Options: 'openai' (Anthropic doesn't provide embeddings)
     
     # Qdrant Configuration (Production Vector DB)
     qdrant_url: Optional[str] = None
     qdrant_api_key: Optional[str] = None
-    qdrant_collection_name: str = "vena_rag_bot"
+    qdrant_collection_name: str = "fcs-rag-bot-prod"  # Default matches production collection
     
     # Database Configuration (Postgres)
     database_url: Optional[str] = None
@@ -59,10 +69,17 @@ class Settings(BaseSettings):
     # Ingestion API Key (optional - for securing the /api/ingest endpoint)
     ingestion_api_key: Optional[str] = None
     
+    # Vena API Configuration (optional - for real-time tenant data)
+    vena_api_user: Optional[str] = None  # apiUser from Application Token
+    vena_api_key: Optional[str] = None   # apiKey from Application Token
+    vena_tenant_name: Optional[str] = None  # Tenant name (e.g., "Vena Workshop")
+    vena_api_hub: str = "eu1"  # Hub/region (eu1, us1, etc.) - extracted from tenant URL
+    vena_api_base_url: Optional[str] = None  # Auto-constructed from hub if not provided
+    
     # RAG Configuration
     chunk_size: int = 500  # tokens per chunk
     chunk_overlap: int = 50  # overlap between chunks
-    top_k_results: int = 10  # number of documents to retrieve (increased for better multi-system question coverage)
+    top_k_results: int = 20  # number of documents to retrieve (increased for better multi-system question coverage and troubleshooting queries)
     
     # Model Configuration
     max_tokens: int = 2000  # max response tokens
@@ -98,6 +115,15 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False
     )
+    
+    @property
+    def vena_api_base_url_computed(self) -> Optional[str]:
+        """Compute Vena API base URL from hub if not explicitly set."""
+        if self.vena_api_base_url:
+            return self.vena_api_base_url
+        if self.vena_api_hub:
+            return f"https://{self.vena_api_hub}.vena.io/api/public/v1"
+        return None
 
 
 # Global settings instance
