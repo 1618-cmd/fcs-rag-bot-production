@@ -130,7 +130,8 @@ export default function Chat() {
                   }
                 }}
                 placeholder="Ask anything"
-                className="flex-1 py-3 bg-transparent text-base text-gray-900 placeholder-gray-500 focus:outline-none"
+                className="flex-1 py-4 bg-transparent text-base text-gray-900 placeholder-gray-500 focus:outline-none"
+                style={{ paddingTop: '1rem', paddingBottom: '1rem' }}
               />
               
               {/* Send Button - Circular */}
@@ -252,13 +253,15 @@ export default function Chat() {
           
           {/* Input Box - Fixed at Bottom, Clean ChatGPT style */}
           <div 
-            className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-4"
+            className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-6"
             style={{ 
               bottom: 0, 
               left: 0, 
               right: 0, 
               zIndex: 50,
-              backgroundColor: '#ffffff'
+              backgroundColor: '#ffffff',
+              paddingTop: '1.5rem',
+              paddingBottom: '1.5rem'
             }}
           >
             <Container size="md">
@@ -277,7 +280,8 @@ export default function Chat() {
                   }}
                   placeholder="Ask anything"
                   disabled={isLoading}
-                  className="flex-1 py-3 bg-transparent text-base text-gray-900 placeholder-gray-500 focus:outline-none disabled:cursor-not-allowed"
+                  className="flex-1 py-4 bg-transparent text-base text-gray-900 placeholder-gray-500 focus:outline-none disabled:cursor-not-allowed"
+                  style={{ paddingTop: '1rem', paddingBottom: '1rem' }}
                 />
                 
                 {/* Send Button - Circular */}
