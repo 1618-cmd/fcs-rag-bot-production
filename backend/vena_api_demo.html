@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vena API - Available Endpoints</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        .endpoint-method {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+        .method-get {
+            background: #28a745;
+            color: white;
+        }
+        .method-post {
+            background: #007bff;
+            color: white;
+        }
+        .endpoint-url {
+            font-family: 'Courier New', monospace;
+            background: #e9ecef;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        .endpoint-description {
+            color: #666;
+            margin-top: 10px;
+        }
+        .endpoint-params {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+        .endpoint-params li {
+            margin: 5px 0;
+            color: #555;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-working {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-requires-id {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box strong {
+            color: #1976D2;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Vena API Integration</h1>
+        <p>Available Endpoints & Capabilities</p>
+    </div>
+
+    <div class="info-box">
+        <strong>Base URL:</strong> <code>https://{hub}.vena.io/api/public/v1/</code><br>
+        <strong>Authentication:</strong> HTTP Basic Auth (apiUser / apiKey)<br>
+        <strong>Current Hub:</strong> eu1<br>
+        <strong>Status:</strong> <span class="status status-working">Authentication Working ✓</span>
+    </div>
+
+    <div class="section">
+        <h2>Data Export Endpoints</h2>
+        
+        <div class="endpoint">
+            <span class="endpoint-method method-get">GET</span>
+            <span class="status status-requires-id">Requires Model ID</span>
+            <div class="endpoint-url">/models/{modelID}/intersections</div>
+            <div class="endpoint-description">
+                <strong>Get intersection data from a Vena model.</strong> This is the primary endpoint for exporting actual data values.
+            </div>
+            <div class="endpoint-params">
+                <strong>Parameters:</strong>
+                <ul>
+                    <li><code>modelID</code> - The model ID (required, get from Vena UI)</li>
+                    <li><code>filters</code> - JSON array of filters (optional)
+                        <br>Example: <code>[{"field":"Year","eq":"2023"}]</code>
+                    </li>
+                    <li><code>fields</code> - Comma-separated list of fields to return (optional)</li>
+                </ul>
+                <strong>Example URL:</strong>
+                <code>https://eu1.vena.io/api/public/v1/models/{modelID}/intersections?filters=[{"field":"Year","eq":"2023"}]</code>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Model Structure Endpoints</h2>
+        
+        <div class="endpoint">
+            <span class="endpoint-method method-get">GET</span>
+            <div class="endpoint-url">/models/{modelID}</div>
+            <div class="endpoint-description">
+                <strong>Get model structure and metadata.</strong> Returns information about a specific data model including dimensions and hierarchies.
+            </div>
+            <div class="endpoint-params">
+                <strong>Parameters:</strong>
+                <ul>
+                    <li><code>modelID</code> - The model ID (required)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <span class="endpoint-method method-get">GET</span>
+            <div class="endpoint-url">/models</div>
+            <div class="endpoint-description">
+                <strong>List all available models.</strong> Returns a list of data models in the tenant.
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Dimension Endpoints</h2>
+        
+        <div class="endpoint">
+            <span class="endpoint-method method-get">GET</span>
+            <div class="endpoint-url">/models/{modelID}/dimensions</div>
+            <div class="endpoint-description">
+                <strong>Get all dimensions for a model.</strong> Returns list of dimensions (Account, Entity, Period, Measure, etc.)
+            </div>
+            <div class="endpoint-params">
+                <strong>Parameters:</strong>
+                <ul>
+                    <li><code>modelID</code> - The model ID (required)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <span class="endpoint-method method-get">GET</span>
+            <div class="endpoint-url">/models/{modelID}/dimensions/{dimensionName}/members</div>
+            <div class="endpoint-description">
+                <strong>Get members of a specific dimension.</strong> Returns all members (e.g., all Account codes, all Entities)
+            </div>
+            <div class="endpoint-params">
+                <strong>Parameters:</strong>
+                <ul>
+                    <li><code>modelID</code> - The model ID (required)</li>
+                    <li><code>dimensionName</code> - Name of dimension (e.g., "Account", "Entity", "Period")</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>ETL & Integration Endpoints</h2>
+        
+        <div class="endpoint">
+            <span class="endpoint-method method-get">GET</span>
+            <div class="endpoint-url">/templates</div>
+            <div class="endpoint-description">
+                <strong>Get list of ETL templates.</strong> Returns all ETL templates configured in the tenant.
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <span class="endpoint-method method-get">GET</span>
+            <div class="endpoint-url">/jobs</div>
+            <div class="endpoint-description">
+                <strong>Get list of ETL jobs.</strong> Returns ETL job execution history.
+            </div>
+            <div class="endpoint-params">
+                <strong>Parameters:</strong>
+                <ul>
+                    <li><code>templateId</code> - Optional template ID to filter jobs</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>What We Can Access</h2>
+        <ul>
+            <li><strong>Real-time data values</strong> - Actual numbers from the Vena model (revenue, expenses, etc.)</li>
+            <li><strong>Model structure</strong> - Dimensions, hierarchies, and metadata</li>
+            <li><strong>Dimension members</strong> - All accounts, entities, periods, scenarios, etc.</li>
+            <li><strong>ETL information</strong> - Templates and job history</li>
+            <li><strong>Filtered queries</strong> - Get data for specific years, entities, accounts, etc.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>How to Get a Model ID</h2>
+        <ol>
+            <li>Log into Vena at <code>https://eu1.vena.io</code></li>
+            <li>Navigate to <strong>Modeler</strong> tab</li>
+            <li>Select <strong>Data Model</strong> from the sidebar</li>
+            <li>Click on a data model name</li>
+            <li>The Model ID appears in:
+                <ul>
+                    <li>The URL (look for a long ID in the URL path)</li>
+                    <li>Model details page (usually shown at the top)</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>Official Documentation</h2>
+        <p>Full Vena API documentation available at:</p>
+        <p><a href="https://developers.venasolutions.com/" target="_blank" style="color: #667eea; font-weight: bold;">https://developers.venasolutions.com/</a></p>
+        <p><a href="https://developers.venasolutions.com/reference" target="_blank" style="color: #667eea; font-weight: bold;">https://developers.venasolutions.com/reference</a></p>
+    </div>
+
+    <div class="info-box">
+        <strong>Note:</strong> All endpoints use <strong>read-only</strong> operations. We can retrieve data but cannot modify or delete anything in the Vena tenant.
+    </div>
+</body>
+</html>

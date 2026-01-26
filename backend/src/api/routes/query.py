@@ -77,6 +77,8 @@ class QueryRequest(BaseModel):
     top_k: Optional[int] = Field(None, description="Number of documents to retrieve (default: 5)", ge=1, le=10)
     skip_cache: bool = Field(default=False, description="Skip cache and force fresh response")
     calc_script: Optional[str] = Field(None, description="Optional VenaQL calculation script to analyze (paste text here)", max_length=50000)
+    vena_model_id: Optional[str] = Field(None, description="Optional Vena Model ID for live tenant data queries")
+    llm_provider: Optional[str] = Field(None, description="LLM provider to use: 'openai' or 'anthropic'. If not provided, uses default from LLM_PROVIDER env var")
 
 
 class Source(BaseModel):
@@ -103,13 +105,17 @@ async def query_rag(request: Request, body: QueryRequest):
     
     Supports calc script analysis via calc_script field (paste text directly).
     For file uploads, use /api/query/upload endpoint.
+    
+    Optional vena_model_id: Provide a Vena Model ID to fetch live tenant data.
     """
     return await _process_query(
         request=request,
         question=body.question,
         calc_script=body.calc_script,
         top_k=body.top_k,
-        skip_cache=body.skip_cache
+        skip_cache=body.skip_cache,
+        vena_model_id=body.vena_model_id,
+        llm_provider=body.llm_provider
     )
 
 
@@ -121,7 +127,8 @@ async def query_rag_with_file(
     calc_script: Optional[str] = Form(None),
     calc_script_file: Optional[UploadFile] = File(None),
     top_k: Optional[int] = Form(None),
-    skip_cache: bool = Form(False)
+    skip_cache: bool = Form(False),
+    vena_model_id: Optional[str] = Form(None)
 ):
     """
     Query the RAG system with file upload support.
@@ -131,6 +138,8 @@ async def query_rag_with_file(
     - calc_script_file: Upload Word doc (.docx) or text file (.txt, .venaql, .calc)
     
     If both calc_script and calc_script_file are provided, calc_script takes precedence.
+    
+    Optional vena_model_id: Provide a Vena Model ID to fetch live tenant data.
     """
     # Extract text from uploaded file if provided
     calc_script_text = calc_script
@@ -143,7 +152,9 @@ async def query_rag_with_file(
         question=question,
         calc_script=calc_script_text,
         top_k=top_k,
-        skip_cache=skip_cache
+        skip_cache=skip_cache,
+        vena_model_id=vena_model_id,
+        llm_provider=None  # File upload doesn't support provider selection yet
     )
 
 
@@ -152,7 +163,9 @@ async def _process_query(
     question: str,
     calc_script: Optional[str] = None,
     top_k: Optional[int] = None,
-    skip_cache: bool = False
+    skip_cache: bool = False,
+    vena_model_id: Optional[str] = None,
+    llm_provider: Optional[str] = None
 ) -> QueryResponse:
     """
     Internal function to process RAG queries.
@@ -231,9 +244,9 @@ Question: {question}"""
         
         # Query the pipeline (async version for better performance)
         # Falls back to sync if async fails
-        logger.info(f"Processing query: {query_text[:100]}...")
+        logger.info(f"Processing query: {query_text[:100]}... (model_id: {vena_model_id or 'none'}, provider: {llm_provider or 'default'})")
         try:
-            result = await pipeline.query_async(query_text)
+            result = await pipeline.query_async(query_text, model_id=vena_model_id, llm_provider=llm_provider)
             # Ensure result is a tuple with 2 elements
             if isinstance(result, tuple) and len(result) == 2:
                 response, documents = result
@@ -243,6 +256,7 @@ Question: {question}"""
         except (ValueError, IndexError, TypeError) as async_error:
             logger.warning(f"Async query failed ({type(async_error).__name__}: {async_error}), falling back to sync")
             try:
+                # Sync query doesn't support model_id yet, but that's OK for fallback
                 result = pipeline.query(query_text)
                 # Ensure result is a tuple with 2 elements
                 if isinstance(result, tuple) and len(result) == 2:
@@ -300,12 +314,24 @@ Question: {question}"""
         
         logger.info(f"Query completed in {latency_ms:.2f}ms")
         
+        # Determine model name for response
+        if llm_provider == "anthropic":
+            model_name = settings.anthropic_model
+        elif llm_provider == "openai":
+            model_name = settings.openai_model
+        else:
+            # Use default from settings
+            if settings.llm_provider == "anthropic":
+                model_name = settings.anthropic_model
+            else:
+                model_name = settings.openai_model
+        
         # Build response
         query_response = QueryResponse(
             answer=response,
             sources=sources,
             latency_ms=round(latency_ms, 2),
-            model=settings.openai_model,
+            model=model_name,
         )
         
         # Cache the response for future queries

@@ -531,6 +531,111 @@ Each question will be evaluated on:
 
 ---
 
+## Question 11: VenaQL Calculation Script - Intercompany Eliminations
+
+### Question
+
+"How do I write a VenaQL script that handles intercompany eliminations with multiple entity relationships, includes error checking for missing data, and uses nested IF statements to apply different elimination rules based on entity type?"
+
+### Systems Involved
+
+- VenaQL Calculation Scripts
+- Scope Statements
+- Variables (@variables)
+- Conditional Statements (If/ElseIf/Else/End)
+- Entity Relationships
+- Error Checking
+- Intercompany Eliminations
+
+### Expected Answer Components
+
+1. Complete VenaQL calculation script example (not SQL query syntax)
+2. Proper Scope statement configuration for multiple entities
+3. Error checking using comparison operators (e.g., `!= 0`, not `IsNull()`)
+4. Nested If/ElseIf/Else/End statements (not SQL IF() functions)
+5. Different elimination rules based on entity type
+6. Correct syntax: `If ( condition )` with `ElseIf` and `End` (not `Then` or `Or`)
+7. Use of boolean operators `&&` and `||` (not `And` and `Or`)
+
+### Answer Template
+
+**Date Tested:** _______________  
+**RAG Bot Response:**
+
+[Paste answer here]
+
+**Evaluation:**
+
+- Accuracy: ___/10
+- Specificity: ___/10
+- Synthesis: ___/10
+- Relationships: ___/10
+- Source Quality: ___/10
+- Completeness: ___/10
+
+**Total Score:** ___/60
+
+**Notes:**
+- What worked well:
+- What needs improvement:
+- Missing information:
+- Syntax correctness (calculation script vs SQL query):
+- Code completeness (full script shown vs descriptions only):
+
+---
+
+## Question 12: VenaQL Troubleshooting - Incorrect Results
+
+### Question
+
+"What are the specific steps required to troubleshoot a VenaQL query that returns incorrect results, and how do I verify each step is working correctly?"
+
+### Systems Involved
+
+- VenaQL Calculation Scripts
+- Scope Statements
+- Troubleshooting Methodology
+- Verification Steps
+- Error Diagnosis
+- Query Debugging
+
+### Expected Answer Components
+
+1. Step-by-step troubleshooting process (minimum 5-6 steps)
+2. Specific verification methods for each step
+3. Common causes of incorrect results (scope conflicts, member mismatches, empty intersections)
+4. How to identify the root cause of the issue
+5. Multiple solution options with code examples
+6. Verification techniques to confirm each fix works
+7. Best practices for preventing similar issues
+
+### Answer Template
+
+**Date Tested:** _______________  
+**RAG Bot Response:**
+
+[Paste answer here]
+
+**Evaluation:**
+
+- Accuracy: ___/10
+- Specificity: ___/10
+- Synthesis: ___/10
+- Relationships: ___/10
+- Source Quality: ___/10
+- Completeness: ___/10
+
+**Total Score:** ___/60
+
+**Notes:**
+- What worked well:
+- What needs improvement:
+- Missing information:
+- Were specific troubleshooting steps provided?
+- Were verification methods included for each step?
+
+---
+
 ## Benchmark Summary
 
 ### Overall Performance
@@ -550,6 +655,8 @@ Each question will be evaluated on:
 | Q8: Insert Row + Dynamic Mapping | ___/60 | ___ | |
 | Q9: Comments + Workflows | ___/60 | ___ | |
 | Q10: Expand/Collapse + Hierarchy | ___/60 | ___ | |
+| Q11: VenaQL Intercompany Eliminations | ___/60 | ___ | |
+| Q12: VenaQL Troubleshooting - Incorrect Results | ___/60 | ___ | |
 
 **Average Score:** ___/60  
 **Overall Grade:** ___

@@ -17,6 +17,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'anthropic' | undefined>(undefined);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -27,8 +28,8 @@ export default function Chat() {
     setIsLoading(true);
     
     try {
-      // Call the backend RAG API
-      const response: QueryResponse = await queryRAG(userMessage);
+      // Call the backend RAG API with selected provider
+      const response: QueryResponse = await queryRAG(userMessage, false, selectedProvider);
       
       // Add assistant response to messages with sources
       setMessages(prev => [...prev, { 
@@ -70,6 +71,47 @@ export default function Chat() {
             <p className="text-base text-gray-600">
               Ask me anything about the Vena platform
             </p>
+          </div>
+          
+          {/* Model Selector */}
+          <div className="mb-6">
+            <Container size="md">
+              <div className="flex items-center gap-4 justify-center">
+                <span className="text-sm text-gray-600">Model:</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedProvider('openai')}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                      selectedProvider === 'openai'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    GPT-4o
+                  </button>
+                  <button
+                    onClick={() => setSelectedProvider('anthropic')}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                      selectedProvider === 'anthropic'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Claude 3.5
+                  </button>
+                  <button
+                    onClick={() => setSelectedProvider(undefined)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                      selectedProvider === undefined
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Default
+                  </button>
+                </div>
+              </div>
+            </Container>
           </div>
           
           {/* Input Box - Centered, Clean ChatGPT style */}
@@ -121,7 +163,7 @@ export default function Chat() {
       {messages.length > 0 && (
         <>
           {/* Messages Area - Scrollable */}
-          <div className="flex-1 overflow-y-auto" style={{ paddingBottom: '140px' }}>
+          <div className="flex-1 overflow-y-auto" style={{ paddingBottom: '180px' }}>
             <Container size="md">
               <div className="py-8 overflow-x-hidden">
                 {messages.map((message, index) => (
@@ -154,11 +196,64 @@ export default function Chat() {
             </Container>
           </div>
           
+          {/* Model Selector - Fixed at bottom above input */}
+          <div 
+            className="fixed left-0 right-0 bg-white border-t border-gray-200 py-3"
+            style={{ 
+              bottom: '72px', 
+              left: 0, 
+              right: 0, 
+              zIndex: 40,
+              backgroundColor: '#ffffff',
+              boxShadow: '0 -1px 0 0 rgba(0,0,0,0.05)'
+            }}
+          >
+            <Container size="md">
+              <div className="flex items-center gap-4 justify-center">
+                <span className="text-sm text-gray-600">Model:</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedProvider('openai')}
+                    disabled={isLoading}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                      selectedProvider === 'openai'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    GPT-4o
+                  </button>
+                  <button
+                    onClick={() => setSelectedProvider('anthropic')}
+                    disabled={isLoading}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                      selectedProvider === 'anthropic'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    Claude 3.5
+                  </button>
+                  <button
+                    onClick={() => setSelectedProvider(undefined)}
+                    disabled={isLoading}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                      selectedProvider === undefined
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    Default
+                  </button>
+                </div>
+              </div>
+            </Container>
+          </div>
+          
           {/* Input Box - Fixed at Bottom, Clean ChatGPT style */}
           <div 
             className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-4"
             style={{ 
-              position: 'fixed', 
               bottom: 0, 
               left: 0, 
               right: 0, 

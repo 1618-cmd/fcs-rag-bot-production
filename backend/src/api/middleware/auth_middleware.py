@@ -29,9 +29,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             user_info = verify_jwt_token(token)
             
             if user_info and user_info.get('user_id'):
-                # Set user_id in request.state for rate limiting
+                # Set user info in request.state for rate limiting and Sentry
                 request.state.user_id = user_info.get('user_id')
-                logger.debug(f"Set user_id in request.state: {user_info.get('user_id')}")
+                request.state.tenant_id = user_info.get('tenant_id')
+                request.state.role = user_info.get('role')
+                logger.debug(f"Set user info in request.state: user_id={user_info.get('user_id')}")
         
         response = await call_next(request)
         return response

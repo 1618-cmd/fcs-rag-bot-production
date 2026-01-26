@@ -48,8 +48,19 @@ export default function TabsNavigation() {
   const isHomePage = pathname === '/';
   const isAdminPage = pathname?.startsWith('/admin');
 
-  const handleLoginClick = () => {
-    router.push('/login?next=/chat');
+  const handleLoginClick = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    console.log('Login button clicked, navigating to /login');
+    try {
+      router.push('/login?next=/chat');
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback to window.location if router fails
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?next=/chat';
+      }
+    }
   };
 
   const isAppArea = pathname === '/chat' || pathname?.startsWith('/admin');
@@ -98,22 +109,36 @@ export default function TabsNavigation() {
           </div>
         )}
         {/* Login/Logout Button - Top Right */}
-        <div className="flex items-center flex-shrink-0" style={{ marginRight: '2.5%' }}>
-          {mounted && (hasToken ? (
+        <div className="flex items-center flex-shrink-0" style={{ marginRight: '2.5%', position: 'relative', zIndex: 100 }}>
+          {!mounted ? (
+            // Show login button immediately while checking auth status
             <button
+              type="button"
+              onClick={handleLoginClick}
+              className="px-4 py-3 font-medium text-sm bg-white hover:bg-white border-0 outline-none transition-colors text-gray-600 hover:text-gray-900 cursor-pointer"
+              style={{ position: 'relative', zIndex: 101 }}
+            >
+              Login
+            </button>
+          ) : hasToken ? (
+            <button
+              type="button"
               onClick={handleLogout}
-              className="px-4 py-3 font-medium text-sm bg-white hover:bg-white border-0 outline-none transition-colors text-gray-600 hover:text-gray-900"
+              className="px-4 py-3 font-medium text-sm bg-white hover:bg-white border-0 outline-none transition-colors text-gray-600 hover:text-gray-900 cursor-pointer"
+              style={{ position: 'relative', zIndex: 101 }}
             >
               Logout
             </button>
           ) : (
             <button
+              type="button"
               onClick={handleLoginClick}
-              className="px-4 py-3 font-medium text-sm bg-white hover:bg-white border-0 outline-none transition-colors text-gray-600 hover:text-gray-900"
+              className="px-4 py-3 font-medium text-sm bg-white hover:bg-white border-0 outline-none transition-colors text-gray-600 hover:text-gray-900 cursor-pointer"
+              style={{ position: 'relative', zIndex: 101 }}
             >
               Login
             </button>
-          ))}
+          )}
         </div>
       </div>
     </div>

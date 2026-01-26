@@ -1,7 +1,8 @@
 """
 RAG retrieval and response generation pipeline for Production.
 
-Handles semantic search in Qdrant and response synthesis using GPT-4o.
+Handles semantic search in Qdrant and response synthesis using configurable LLM providers.
+Supports OpenAI GPT-4o and Anthropic Claude via compatibility layer.
 """
 
 import asyncio
@@ -9,12 +10,14 @@ import logging
 from typing import List, Tuple, Optional
 from pathlib import Path
 
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Qdrant
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import Document
 
 from ..utils.config import settings
+from ..services.vena_api import VenaAPIClient
+from ..services.llm_provider import create_llm_provider
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -76,6 +79,21 @@ SOURCE VERIFICATION REQUIREMENTS:
 - If you refuse to answer because information is missing, do NOT cite any sources - citing sources implies you used them
 - Always cite sources using [Source: document_name] format - use the full document name, not generic references
 - Before listing sources, verify: "Did I actually use information from this source in my answer?" If no, remove it from the source list
+
+CRITICAL VENAQL CALCULATION SCRIPT SYNTAX RULES (MUST FOLLOW):
+**NEVER USE ForEach LOOPS - THEY DO NOT EXIST IN VENAQL CALCULATION SCRIPTS**
+**NEVER USE curly braces {{}} - USE If/ElseIf/Else/End structure ONLY**
+**ALWAYS USE aggregation functions (.Sum(), .Avg(), .Count(), etc.) instead of loops**
+
+When generating VenaQL calculation script code:
+- Use If/ElseIf/Else/End for conditional logic
+- Use aggregation functions (.Sum(), .Avg(), .Count(), .Max(), .Min()) for calculations
+- NEVER use ForEach, For, While, or any loop constructs
+- NEVER use curly braces {{}} - they are NOT valid in VenaQL calculation scripts
+- Use comparison operators: !=, ==, <, >, <=, >=
+- Use boolean operators: And, Or, Not
+- Example CORRECT syntax: @total = [Account.7200].Sum()
+- Example WRONG syntax: ForEach [Account] Do @total = @total + [Account.7200] End
 
 CRITICAL GUIDELINES:
 1. SYNTHESISE information from multiple context documents when answering complex questions - this is ESSENTIAL and REQUIRED
@@ -232,8 +250,10 @@ If the question asks "How do I write a VenaQL script..." or "Show me a VenaQL sc
 4. Use REALISTIC dimension/member names (e.g., [Account.7200], [Entity.Homelink], [Measure.Value])
 5. DO NOT write explanations before the code - CODE FIRST, then explain
 6. DO NOT use placeholders like "your dimension" or "your member" - use actual examples
-7. DO NOT use curly braces {} or ForEach loops - use If/ElseIf/Else/End structure
-8. DO NOT describe what the code should do - SHOW THE ACTUAL CODE
+7. **CRITICAL: NEVER USE ForEach LOOPS - THEY DO NOT EXIST IN VENAQL CALCULATION SCRIPTS**
+8. **CRITICAL: NEVER USE curly braces {{}} - USE If/ElseIf/Else/End structure ONLY**
+9. **CRITICAL: Use aggregation functions (.Sum(), .Avg(), .Count(), etc.) instead of loops**
+10. DO NOT describe what the code should do - SHOW THE ACTUAL CODE
 
 **EXAMPLE OF CORRECT FORMAT:**
 ```venaql
@@ -251,9 +271,25 @@ End
 @this = @elimination
 ```
 
+**WRONG FORMAT - NEVER DO THIS (ForEach DOES NOT EXIST):**
+```venaql
+// WRONG - ForEach loops do NOT exist in VenaQL calculation scripts
+ForEach [Period.Months] Do
+  @value = @value + [Measure.Value]
+End
+```
+
+**CORRECT FORMAT - Use aggregation functions instead:**
+```venaql
+@total = [Measure.Value].Sum()  // CORRECT - Use .Sum() function
+@average = [Measure.Value].Avg()  // CORRECT - Use .Avg() function
+@count = [Measure.Value].Count()  // CORRECT - Use .Count() function
+```
+
 **WRONG FORMAT (DO NOT DO THIS):**
 "Here's how you can write a VenaQL script... The script should include... You would use..."
 
+**IF YOU USE ForEach OR CURLY BRACES {{}}, YOU HAVE FAILED THE INSTRUCTION.**
 **IF YOU DO NOT START WITH A CODE BLOCK FOR CODE GENERATION QUESTIONS, YOU HAVE FAILED THE INSTRUCTION.**
 
 CRITICAL SYNTHESIS RULE - READ FIRST:
@@ -353,23 +389,65 @@ class RAGPipeline:
     def __init__(self):
         """Initialize the RAG pipeline."""
         try:
-            # Initialize embeddings
+            # Initialize embeddings (can use OpenAI even with Claude LLM)
             self.embeddings = OpenAIEmbeddings(
                 model=settings.embedding_model,
                 openai_api_key=settings.openai_api_key
             )
             
-            # Initialize LLM
-            self.llm = ChatOpenAI(
-                model=settings.openai_model,
+            # Initialize LLM using compatibility layer
+            # Automatically selects provider based on LLM_PROVIDER env var
+            provider = settings.llm_provider.lower()
+            
+            # Get appropriate API key and model based on provider
+            if provider == "openai":
+                api_key = settings.openai_api_key
+                model = settings.openai_model
+            elif provider == "anthropic":
+                api_key = settings.anthropic_api_key or ""
+                model = settings.anthropic_model
+                if not api_key:
+                    raise ValueError(
+                        "ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic"
+                    )
+            else:
+                raise ValueError(
+                    f"Unsupported LLM provider: {provider}. "
+                    f"Supported providers: 'openai', 'anthropic'"
+                )
+            
+            # Create LLM provider instance
+            llm_provider_instance = create_llm_provider(
+                provider=provider,
+                api_key=api_key,
+                model=model,
                 temperature=settings.temperature,
                 max_tokens=settings.max_tokens,
-                openai_api_key=settings.openai_api_key
+            )
+            
+            # Get LangChain chat model (works with both providers)
+            self.llm = llm_provider_instance.get_chat_model()
+            self.llm_provider_name = llm_provider_instance.get_provider_name()
+            self.llm_model_name = llm_provider_instance.get_model_name()
+            
+            logger.info(
+                f"Initialized LLM: {self.llm_provider_name}/{self.llm_model_name}"
             )
             
             # Load vector store
             self.vector_store = None
             self._load_vector_store()
+            
+            # Initialize Vena API client (optional - graceful if not configured)
+            try:
+                self.vena_api = VenaAPIClient()
+                if self.vena_api.enabled:
+                    logger.info("Vena API client initialized and enabled")
+                else:
+                    logger.info("Vena API client initialized but disabled (credentials not configured)")
+            except Exception as vena_error:
+                logger.warning(f"Vena API client initialization failed (non-critical): {vena_error}")
+                self.vena_api = None
             
             # Log configuration for debugging
             logger.info(f"RAG Pipeline initialized with top_k_results={settings.top_k_results}")
@@ -426,9 +504,53 @@ class RAGPipeline:
             logger.warning("Vector store not available. Run ingestion first!")
             self.vector_store = None
     
+    def _expand_query(self, query: str) -> str:
+        """
+        Expand query with related terms to improve semantic matching.
+        
+        This helps match user questions to relevant documents even when
+        the exact phrasing differs (e.g., "troubleshoot" → "troubleshooting steps").
+        
+        Args:
+            query: Original user query
+            
+        Returns:
+            Expanded query string
+        """
+        # Query expansion mappings for common VenaQL/Vena terms
+        expansions = {
+            'troubleshoot': ['troubleshooting', 'troubleshoot', 'debug', 'fix', 'error', 'problem'],
+            'troubleshooting': ['troubleshoot', 'troubleshooting', 'debug', 'fix', 'error', 'problem'],
+            'steps': ['step', 'steps', 'procedure', 'process', 'method', 'guide'],
+            'verify': ['verify', 'check', 'validate', 'confirm', 'test'],
+            'venaql': ['venaql', 'vena ql', 'calculation script', 'calc script'],
+            'query': ['query', 'script', 'calculation', 'venaql'],
+            'incorrect': ['incorrect', 'wrong', 'error', 'problem', 'issue', 'failing'],
+            'results': ['results', 'output', 'values', 'data', 'return'],
+        }
+        
+        # Extract key terms from query (simple word-based approach)
+        query_lower = query.lower()
+        expanded_terms = set(query.split())
+        
+        # Add expansions for key terms found in query
+        for term, related_terms in expansions.items():
+            if term in query_lower:
+                expanded_terms.update(related_terms)
+        
+        # Combine original query with expanded terms
+        # Keep original query first to maintain semantic meaning
+        expanded_query = query + " " + " ".join(expanded_terms)
+        
+        logger.debug(f"Query expansion: '{query}' → '{expanded_query[:100]}...'")
+        return expanded_query
+    
     def retrieve(self, query: str, top_k: int = None) -> List[Document]:
         """
         Retrieve relevant documents for a query.
+        
+        Uses query expansion to improve semantic matching for troubleshooting
+        and technical queries.
         
         Args:
             query: User query string
@@ -442,8 +564,12 @@ class RAGPipeline:
         
         try:
             k = top_k or settings.top_k_results
+            
+            # Expand query for better semantic matching
+            expanded_query = self._expand_query(query)
+            
             logger.info(f"Retrieving {k} documents (top_k_results={settings.top_k_results})")
-            documents = self.vector_store.similarity_search(query, k=k)
+            documents = self.vector_store.similarity_search(expanded_query, k=k)
             logger.info(f"Retrieved {len(documents)} documents for query")
             
             # Log retrieved document names for debugging
@@ -470,18 +596,23 @@ class RAGPipeline:
         """
         return await asyncio.to_thread(self.retrieve, query, top_k)
     
-    def format_context(self, documents: List[Document]) -> str:
+    def format_context(self, documents: List[Document], vena_context: Optional[str] = None) -> str:
         """
         Format retrieved documents as context for the LLM.
         Organises documents to help LLM understand relationships.
         
         Args:
             documents: List of retrieved documents
+            vena_context: Optional Vena API context to include
             
         Returns:
             Formatted context string with better organisation
         """
         context_parts = []
+        
+        # Add Vena API context first if available
+        if vena_context:
+            context_parts.append(f"[Live Vena Tenant Data]\n{vena_context}\n")
         
         # Group documents by type/category if possible
         # Extract full path for better source identification
@@ -515,13 +646,55 @@ class RAGPipeline:
         
         return formatted_context
     
-    def generate_response(self, query: str, documents: List[Document]) -> str:
+    def _get_llm_for_provider(self, provider: Optional[str] = None):
+        """
+        Get LLM instance for a specific provider, or use default.
+        
+        Args:
+            provider: Provider name ('openai' or 'anthropic'), or None to use default
+            
+        Returns:
+            LangChain BaseChatModel instance
+        """
+        if provider is None:
+            # Use default LLM
+            return self.llm
+        
+        # Create a temporary LLM instance for this specific query
+        provider = provider.lower()
+        from ..services.llm_provider import create_llm_provider
+        
+        if provider == "openai":
+            api_key = settings.openai_api_key
+            model = settings.openai_model
+        elif provider == "anthropic":
+            api_key = settings.anthropic_api_key or ""
+            model = settings.anthropic_model
+            if not api_key:
+                logger.warning("ANTHROPIC_API_KEY not set, falling back to default LLM")
+                return self.llm
+        else:
+            logger.warning(f"Unknown provider '{provider}', using default LLM")
+            return self.llm
+        
+        llm_provider_instance = create_llm_provider(
+            provider=provider,
+            api_key=api_key,
+            model=model,
+            temperature=settings.temperature,
+            max_tokens=settings.max_tokens,
+        )
+        
+        return llm_provider_instance.get_chat_model()
+    
+    def generate_response(self, query: str, documents: List[Document], vena_context: Optional[str] = None, llm_provider: Optional[str] = None) -> str:
         """
         Generate a response using the LLM with retrieved context.
         
         Args:
             query: User query
             documents: Retrieved context documents
+            vena_context: Optional Vena API context
             
         Returns:
             Generated response text
@@ -534,7 +707,10 @@ class RAGPipeline:
             else:
                 logger.warning(f"No documents retrieved for query: '{query[:50]}...'")
             
-            context = self.format_context(documents)
+            if vena_context:
+                logger.info("Including Vena API context in response")
+            
+            context = self.format_context(documents, vena_context)
             
             # Escape curly braces in query to prevent template formatting errors
             # VenaQL scripts contain { } which conflict with prompt template syntax
@@ -558,33 +734,149 @@ class RAGPipeline:
                     HumanMessage(content=user_text)
                 ]
             
+            # Get LLM instance (use specified provider or default)
+            llm = self._get_llm_for_provider(llm_provider)
+            
             # Generate response
-            response = self.llm.invoke(messages)
-            return response.content
+            response = llm.invoke(messages)
+            
+            # Handle different response types
+            try:
+                if hasattr(response, 'content'):
+                    return response.content
+                elif isinstance(response, str):
+                    return response
+                elif isinstance(response, (list, tuple)) and len(response) > 0:
+                    # If response is a list/tuple, get first element
+                    first_item = response[0]
+                    if hasattr(first_item, 'content'):
+                        return first_item.content
+                    elif isinstance(first_item, str):
+                        return first_item
+                    else:
+                        return str(first_item)
+                else:
+                    logger.warning(f"Unexpected response type: {type(response)}, converting to string")
+                    return str(response)
+            except (AttributeError, IndexError, TypeError) as content_error:
+                logger.error(f"Error extracting content from response: {content_error}. Response type: {type(response)}")
+                # Fallback: try to convert to string
+                return str(response)
             
         except Exception as e:
-            logger.error(f"Error generating response: {e}")
+            logger.error(f"Error generating response: {e}", exc_info=True)
             raise
     
-    async def generate_response_async(self, query: str, documents: List[Document]) -> str:
+    async def generate_response_async(self, query: str, documents: List[Document], vena_context: Optional[str] = None, llm_provider: Optional[str] = None) -> str:
         """
         Async version of generate_response - runs in thread pool to avoid blocking.
         
         Args:
             query: User query
             documents: Retrieved context documents
+            vena_context: Optional Vena API context
+            llm_provider: Optional LLM provider override ('openai' or 'anthropic')
             
         Returns:
             Generated response text
         """
-        return await asyncio.to_thread(self.generate_response, query, documents)
+        return await asyncio.to_thread(self.generate_response, query, documents, vena_context, llm_provider)
     
-    def query(self, question: str) -> Tuple[str, List[Document]]:
+    def _should_use_vena_api(self, question: str) -> bool:
+        """
+        Smart detection: Determine if question needs live Vena data.
+        Uses both keyword detection and LLM-based intent detection.
+        
+        Args:
+            question: User's question
+            
+        Returns:
+            True if Vena API should be called
+        """
+        if not self.vena_api or not self.vena_api.enabled:
+            return False
+        
+        question_lower = question.lower()
+        
+        # Keywords that indicate need for live data
+        live_data_keywords = [
+            'from vena', 'from my tenant', 'in my tenant', 'my tenant',
+            'hierarchy', 'hierarchies', 'dimension members', 'account hierarchy',
+            'entity hierarchy', 'my model', 'my dimensions', 'my accounts',
+            'live data', 'current data', 'real-time', 'actual data',
+            'get latest', 'refresh', 'show me my', 'what are my',
+            'my stuff', 'my entities', 'my periods', 'what\'s in my',
+            'help me build', 'for my', 'using my',
+            'what accounts', 'what entities', 'what dimensions',  # "what X do I have" pattern
+            'do i have', 'do i have any'  # "what X do I have" pattern
+        ]
+        
+        # Check if question contains live data keywords
+        if any(keyword in question_lower for keyword in live_data_keywords):
+            return True
+        
+        # Also check for vague questions that might need tenant data
+        vague_patterns = [
+            'show me', 'what do i have', 'what are my', 'list my',
+            'my data', 'my structure', 'my setup'
+        ]
+        
+        if any(pattern in question_lower for pattern in vague_patterns):
+            # If it's a vague question, let the LLM intent detection decide
+            return True
+        
+        return False
+    
+    async def _fetch_vena_context(self, question: str, model_id: Optional[str] = None) -> Optional[str]:
+        """
+        Fetch Vena API context with caching.
+        
+        Args:
+            question: User's question
+            model_id: Optional Vena Model ID for live tenant data queries
+            
+        Returns:
+            Formatted Vena context or None
+        """
+        if not self._should_use_vena_api(question):
+            return None
+        
+        try:
+            # Check cache first (use a special cache key format for Vena API)
+            from ..services.cache import get_cached_response, cache_response
+            # Use a normalized cache key (include model_id if provided)
+            cache_key_question = f"vena_api:{model_id or 'default'}:{question}"
+            cached = get_cached_response(cache_key_question)
+            if cached:
+                logger.info("Using cached Vena API response")
+                return cached.get('answer')  # Cache stores as QueryResponse format
+            
+            # Fetch from API
+            logger.info(f"Fetching live data from Vena API... (model_id: {model_id or 'not provided'})")
+            vena_context = await self.vena_api.format_vena_context(question, model_id=model_id)
+            
+            # Cache the response (1 hour TTL = 3600 seconds)
+            if vena_context:
+                cache_response(cache_key_question, {
+                    'answer': vena_context,
+                    'sources': [],
+                    'latency_ms': 0,
+                    'model': 'vena-api'
+                }, ttl_seconds=3600)  # 1 hour cache
+            
+            return vena_context
+            
+        except Exception as e:
+            logger.warning(f"Error fetching Vena API context (non-critical): {e}")
+            return None
+    
+    def query(self, question: str, llm_provider: Optional[str] = None) -> Tuple[str, List[Document]]:
         """
         Main query method: Retrieve relevant docs and generate response.
         
         Args:
             question: User question
+            llm_provider: Optional LLM provider override ('openai' or 'anthropic')
             
         Returns:
             Tuple of (response_text, source_documents)
@@ -596,8 +888,15 @@ class RAGPipeline:
             documents = self.retrieve(question)
             logger.info(f"Retrieved {len(documents)} relevant documents")
             
+            # Fetch Vena API context if needed (sync version - limited functionality)
+            vena_context = None
+            if self._should_use_vena_api(question):
+                logger.info("Vena API needed but sync query - consider using query_async for better performance")
+                # For sync, we skip Vena API to avoid blocking
+                # Users should use query_async for Vena API integration
+            
             # Generate response
-            response = self.generate_response(question, documents)
+            response = self.generate_response(question, documents, vena_context, llm_provider)
             
             return response, documents
             
@@ -605,12 +904,15 @@ class RAGPipeline:
             logger.error(f"Error processing query: {e}")
             raise
     
-    async def query_async(self, question: str) -> Tuple[str, List[Document]]:
+    async def query_async(self, question: str, model_id: Optional[str] = None, llm_provider: Optional[str] = None) -> Tuple[str, List[Document]]:
         """
         Async version of query - runs operations in parallel where possible.
         
+        Fetches Vena API data and knowledge base documents in parallel for better performance.
+        
         Args:
             question: User question
+            model_id: Optional Vena Model ID for live tenant data queries
             
         Returns:
             Tuple of (response_text, source_documents)
@@ -618,12 +920,26 @@ class RAGPipeline:
         logger.info(f"Processing query: {question[:100]}...")
         
         try:
+            # Run Vena API fetch and document retrieval in parallel
+            vena_task = None
+            if self._should_use_vena_api(question):
+                vena_task = self._fetch_vena_context(question, model_id=model_id)
+            
             # Retrieve relevant documents (async)
-            documents = await self.retrieve_async(question)
+            documents_task = self.retrieve_async(question)
+            
+            # Wait for both to complete
+            documents = await documents_task
             logger.info(f"Retrieved {len(documents)} relevant documents")
             
-            # Generate response (async)
-            response = await self.generate_response_async(question, documents)
+            vena_context = None
+            if vena_task:
+                vena_context = await vena_task
+                if vena_context:
+                    logger.info("Vena API context fetched successfully")
+            
+            # Generate response (async) with both knowledge base and Vena context
+            response = await self.generate_response_async(question, documents, vena_context, llm_provider)
             
             return response, documents
             
@@ -646,36 +962,74 @@ class RAGPipeline:
         knowledge_base_path = settings.knowledge_base_dir
         
         for doc in documents:
-            source_path = doc.metadata.get("source", "unknown")
-            
-            # Convert to Path object
-            source = Path(source_path)
-            
-            # Try to extract relative path from knowledge_base for better context
             try:
-                if knowledge_base_path in source.parents or str(source).startswith(str(knowledge_base_path)):
-                    # Get relative path from knowledge_base
-                    relative_path = source.relative_to(knowledge_base_path)
-                    # Convert to forward slashes and remove extension
-                    clean_source = str(relative_path).replace("\\", "/").replace(".md", "").replace(".txt", "").replace(".pdf", "")
+                source_path = doc.metadata.get("source", "unknown")
+                
+                # Handle empty or invalid source paths
+                if not source_path or source_path == "unknown":
+                    clean_source = "unknown"
                 else:
-                    # Fallback: use filename with parent directory if available
-                    if source.parent.name and source.parent.name != ".":
-                        clean_source = f"{source.parent.name}/{source.stem}"
+                    # Convert to Path object
+                    try:
+                        source = Path(source_path)
+                    except (ValueError, TypeError):
+                        # If Path creation fails, use the string as-is
+                        clean_source = str(source_path)
                     else:
-                        clean_source = source.stem
-            except (ValueError, AttributeError):
-                # If path manipulation fails, just use filename
-                clean_source = source.stem
-            
-            # Remove any remaining Windows path separators
-            clean_source = clean_source.replace("\\", "/")
-            
-            # Remove leading slashes
-            clean_source = clean_source.lstrip("/")
-            
-            if clean_source and clean_source not in sources:
-                sources.append(clean_source)
+                        # Try to extract relative path from knowledge_base for better context
+                        try:
+                            # Check if knowledge_base_path is in source's parents
+                            # Use try/except to handle cases where source.parents might fail
+                            in_parents = False
+                            try:
+                                if knowledge_base_path and hasattr(source, 'parents'):
+                                    in_parents = knowledge_base_path in source.parents
+                            except (AttributeError, TypeError, IndexError):
+                                in_parents = False
+                            
+                            if knowledge_base_path and (in_parents or str(source).startswith(str(knowledge_base_path))):
+                                # Get relative path from knowledge_base
+                                try:
+                                    relative_path = source.relative_to(knowledge_base_path)
+                                    # Convert to forward slashes and remove extension
+                                    clean_source = str(relative_path).replace("\\", "/").replace(".md", "").replace(".txt", "").replace(".pdf", "")
+                                except (ValueError, AttributeError):
+                                    # If relative_to fails, fall back to filename
+                                    clean_source = source.stem if hasattr(source, 'stem') else source.name
+                            else:
+                                # Fallback: use filename with parent directory if available
+                                try:
+                                    parent_name = source.parent.name if source.parent and hasattr(source.parent, 'name') else None
+                                    if parent_name and parent_name != ".":
+                                        clean_source = f"{parent_name}/{source.stem}"
+                                    else:
+                                        clean_source = source.stem if hasattr(source, 'stem') else source.name
+                                except (AttributeError, IndexError):
+                                    # If parent access fails, just use filename
+                                    clean_source = source.name if hasattr(source, 'name') else str(source)
+                        except (ValueError, AttributeError, IndexError) as path_error:
+                            # If path manipulation fails, just use filename
+                            try:
+                                clean_source = source.stem if hasattr(source, 'stem') else source.name
+                            except (AttributeError, IndexError):
+                                clean_source = str(source_path)
+                
+                # Remove any remaining Windows path separators
+                clean_source = clean_source.replace("\\", "/")
+                
+                # Remove leading slashes
+                clean_source = clean_source.lstrip("/")
+                
+                if clean_source and clean_source not in sources:
+                    sources.append(clean_source)
+                    
+            except Exception as e:
+                # Log error but continue processing other documents
+                logger.warning(f"Error extracting source from document: {e}. Metadata: {doc.metadata if hasattr(doc, 'metadata') else 'N/A'}")
+                # Add a fallback source name
+                fallback_source = doc.metadata.get("source", "unknown") if hasattr(doc, 'metadata') else "unknown"
+                if fallback_source and fallback_source not in sources:
+                    sources.append(str(fallback_source))
         
         return sources
 

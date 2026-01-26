@@ -8,6 +8,7 @@ export interface QueryRequest {
   question: string;
   top_k?: number;
   skip_cache?: boolean;
+  llm_provider?: 'openai' | 'anthropic';
 }
 
 export interface Source {
@@ -22,14 +23,23 @@ export interface QueryResponse {
   model: string;
 }
 
-export async function queryRAG(question: string, skipCache: boolean = false): Promise<QueryResponse> {
+export async function queryRAG(
+  question: string, 
+  skipCache: boolean = false,
+  llmProvider?: 'openai' | 'anthropic'
+): Promise<QueryResponse> {
   try {
+    const body: QueryRequest = { question, skip_cache: skipCache };
+    if (llmProvider) {
+      body.llm_provider = llmProvider;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/api/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ question, skip_cache: skipCache }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

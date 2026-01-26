@@ -6,9 +6,13 @@ Usage:
     
 Or with custom values:
     python -m scripts.create_admin_user --email admin@example.com --password mypassword --tenant-id default
+
+Non-interactive update (CI / automation):
+    python -m scripts.create_admin_user --email admin@example.com --password mypassword --tenant-id default --yes
 """
 
 import argparse
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -50,15 +54,23 @@ def create_admin_user(email: str, password: str, tenant_id: str = "default", ten
             print(f"   User ID: {existing_user.id}")
             print(f"   Role: {existing_user.role}")
             print(f"   Tenant: {existing_user.tenant_id}")
-            response = input("   Do you want to update this user to admin? (y/n): ")
-            if response.lower() == 'y':
+            # Interactive confirmation is optional (avoid in non-interactive environments)
+            update_existing = os.getenv("FORCE_UPDATE_ADMIN_USER", "").lower() in ("1", "true", "yes", "y")
+            if not update_existing:
+                try:
+                    response = input("   Do you want to update this user to admin (and reset password if provided)? (y/n): ")
+                    update_existing = response.lower() == 'y'
+                except EOFError:
+                    update_existing = False
+
+            if update_existing:
                 existing_user.role = 'admin'
                 existing_user.tenant_id = tenant_id
                 if password:
                     existing_user.password_hash = hash_password(password)
                 existing_user.is_active = True
                 db.commit()
-                print(f"SUCCESS: Updated user {email} to admin role")
+                print(f"SUCCESS: Updated user {email} to admin role (password updated: {'yes' if password else 'no'})")
             return
         
         # Create admin user
@@ -90,8 +102,13 @@ if __name__ == "__main__":
     parser.add_argument("--password", default=None, help="Admin password (default: from env or prompt)")
     parser.add_argument("--tenant-id", default="default", help="Tenant ID (default: 'default')")
     parser.add_argument("--tenant-name", default="Default Tenant", help="Tenant name (default: 'Default Tenant')")
+    parser.add_argument("--yes", action="store_true", help="Non-interactive: update existing user without prompting (also sets password if provided)")
     
     args = parser.parse_args()
+
+    # If --yes, propagate to the create function via env so we don't change its signature.
+    if args.yes:
+        os.environ["FORCE_UPDATE_ADMIN_USER"] = "true"
     
     # Get email
     email = args.email or getattr(settings, 'admin_email', None)

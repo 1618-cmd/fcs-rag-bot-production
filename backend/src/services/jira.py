@@ -148,6 +148,183 @@ def create_ticket(
         }
 
 
+def get_epic_name_field_id(jira: Optional[JIRA] = None) -> Optional[str]:
+    """
+    Auto-detect the Epic Name custom field ID for the project.
+    
+    Args:
+        jira: Optional Jira client instance. If None, will create one.
+        
+    Returns:
+        The Epic Name custom field ID (e.g., "customfield_10011") or None if not found
+    """
+    if jira is None:
+        jira = get_jira_client()
+        if not jira:
+            return None
+    
+    if not settings.jira_project_key:
+        return None
+    
+    try:
+        # Get project metadata
+        project = jira.project(settings.jira_project_key)
+        
+        # Get issue types for the project
+        issue_types = jira.issue_types()
+        
+        # Find Epic issue type
+        epic_type = None
+        for issue_type in issue_types:
+            if issue_type.name.lower() == "epic":
+                epic_type = issue_type
+                break
+        
+        if not epic_type:
+            logger.warning("Epic issue type not found in project")
+            return None
+        
+        # Get create metadata for Epic issue type
+        create_meta = jira.createmeta(
+            projectKeys=settings.jira_project_key,
+            issuetypeIds=epic_type.id,
+            expand="projects.issuetypes.fields"
+        )
+        
+        if not create_meta or not create_meta.get("projects"):
+            return None
+        
+        project_meta = create_meta["projects"][0]
+        if not project_meta.get("issuetypes"):
+            return None
+        
+        epic_meta = project_meta["issuetypes"][0]
+        fields = epic_meta.get("fields", {})
+        
+        # Common Epic Name field IDs to check
+        # Epic Name is typically customfield_10011, but can vary
+        common_epic_fields = [
+            "customfield_10011",  # Most common
+            "customfield_10014",  # Alternative
+            "customfield_10015",  # Alternative
+        ]
+        
+        # Check common field IDs
+        for field_id in common_epic_fields:
+            if field_id in fields:
+                field = fields[field_id]
+                # Verify it's the Epic Name field
+                if "Epic Name" in field.get("name", ""):
+                    logger.info(f"✅ Found Epic Name field: {field_id}")
+                    return field_id
+        
+        # If not found in common fields, search all fields
+        for field_id, field_data in fields.items():
+            if field_id.startswith("customfield_") and "Epic Name" in field_data.get("name", ""):
+                logger.info(f"✅ Found Epic Name field: {field_id}")
+                return field_id
+        
+        logger.warning("Epic Name field not found. You may need to set JIRA_EPIC_NAME_FIELD_ID manually.")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error detecting Epic Name field: {e}", exc_info=True)
+        return None
+
+
+def create_epic(
+    name: str,
+    description: Optional[str] = None,
+    project_key: Optional[str] = None,
+    labels: Optional[list] = None
+) -> Dict[str, Any]:
+    """
+    Create a Jira Epic.
+    
+    Args:
+        name: The Epic name (required)
+        description: Optional Epic description
+        project_key: Optional project key (defaults to settings.jira_project_key)
+        labels: Optional list of labels to add
+        
+    Returns:
+        Dictionary with Epic information or error details
+    """
+    jira = get_jira_client()
+    if not jira:
+        return {
+            "success": False,
+            "error": "Jira not configured. Please set JIRA_SERVER_URL, JIRA_EMAIL, and JIRA_API_TOKEN."
+        }
+    
+    project = project_key or settings.jira_project_key
+    if not project:
+        return {
+            "success": False,
+            "error": "JIRA_PROJECT_KEY not configured"
+        }
+    
+    try:
+        # Auto-detect Epic Name field ID
+        epic_name_field_id = get_epic_name_field_id(jira)
+        if not epic_name_field_id:
+            # Try common field IDs as fallback
+            epic_name_field_id = getattr(settings, 'jira_epic_name_field_id', None) or "customfield_10011"
+            logger.warning(f"Using fallback Epic Name field ID: {epic_name_field_id}")
+        
+        # Prepare Epic fields
+        issue_dict = {
+            "project": {"key": project},
+            "summary": name[:255] if len(name) <= 255 else name[:252] + "...",  # Jira summary max 255 chars
+            "issuetype": {"name": "Epic"}
+        }
+        
+        # Add Epic Name (required for Epics)
+        issue_dict[epic_name_field_id] = name
+        
+        # Add description if provided
+        if description:
+            issue_dict["description"] = description
+        
+        # Add labels if provided
+        if labels:
+            issue_dict["labels"] = labels
+        elif settings.jira_labels:
+            labels_list = [label.strip() for label in settings.jira_labels.split(",")]
+            issue_dict["labels"] = labels_list
+        
+        # Create the Epic
+        new_epic = jira.create_issue(fields=issue_dict)
+        
+        # Get the Epic URL
+        epic_url = f"{settings.jira_server_url}/browse/{new_epic.key}"
+        
+        logger.info(f"✅ Created Jira Epic: {new_epic.key} - {epic_url}")
+        
+        return {
+            "success": True,
+            "epic_key": new_epic.key,
+            "epic_url": epic_url,
+            "epic_id": new_epic.id,
+            "epic_name": name
+        }
+        
+    except JIRAError as e:
+        error_msg = f"Jira API error: {e.text if hasattr(e, 'text') else str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+    except Exception as e:
+        error_msg = f"Failed to create Jira Epic: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+
 def is_jira_configured() -> bool:
     """
     Check if Jira is properly configured.
